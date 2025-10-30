@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Página Principal</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f2f5;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 60px;
+    margin: 0;
+}
+.container {
+    background: white;
+    padding: 40px 30px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+}
+h1 {
+    margin-bottom: 40px;
+    color: #333;
+}
+a.button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px 20px;
+    margin: 15px 0;
+    background: #2c7be5;
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 16px;
+    transition: transform 0.2s, background 0.3s;
+}
+a.button:hover {
+    transform: translateY(-2px);
+    background: #1a5fcc;
+}
+a.button.frete {
+    background: #28a745;
+}
+a.button.frete:hover {
+    background: #1e7e34;
+}
+a.button.pix {
+    background: #ffc107;
+    color: #333;
+}
+a.button.pix:hover {
+    background: #e0a800;
+    color: #fff;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Painel de Ferramentas</h1>
+
+    <a href="pix.html" class="button pix"><i class="fa-solid fa-qrcode"></i> Gerador de PIX</a>
+    <a href="frete.html" class="button frete"><i class="fa-solid fa-truck-fast"></i> Calculadora de Frete</a>
+</div>
+</body>
+</html>
