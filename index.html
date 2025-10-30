@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Gerador PIX Definitivo</title>
+<title>Gerador PIX</title>
 <style>
 body {font-family: Arial, sans-serif; background: #f7f7f7; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;}
 .container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); text-align:center; max-width:400px; width:90%;}
@@ -31,8 +31,8 @@ button:hover {background-color:#1a5fcc;}
 <option value="48426245315">Ivan - Banco do Brasil</option>
 </select>
 
-<button onclick="gerarPix()">Gerar PIX</button>
-<button onclick="copiarPix()">Copiar PIX</button>
+<button onclick="gerarPix()">Gerar código PIX</button>
+<button onclick="copiarPix()">Copiar código PIX</button>
 <button onclick="baixarPDF()">Baixar QR Code em PDF</button>
 
 <div id="pixCode"></div>
@@ -157,3 +157,4 @@ async function baixarPDF(){
 </script>
 </body>
 </html>
+
