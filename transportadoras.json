@@ -190,7 +190,6 @@
     	"Viçosa do Ceara": 48
       }
     },
-
     {
       "nome": "Ceará Transportes",
       "valorPorKg": 0.50,
@@ -201,7 +200,7 @@
       "Abaiara": 72,
     	"Acarape": 24,
     	"Acopiara": 24,
-    	"Aiuaba": "Semanal",
+    	"Aiuaba": "192",
     	"Altaneira": 72,
       "Alto Santo": 24,
     	"Antonina do Norte": 24,
@@ -234,7 +233,7 @@
     	"Granjeiro": 72,
     	"Guaiuba": 24,
     	"Horizonte": 24,
-    	"Icapui": "Semanal",
+    	"Icapui": "192",
     	"Ico": 24,
     	"Iguatu": 24,
     	"Independencia": 24,
@@ -280,7 +279,7 @@
     	"Quixelo": 24,
     	"Quixere": 24,
     	"Russas": 24,
-    	"Saboeiro": "Semanal",
+    	"Saboeiro": "192",
     	"Salitre": 24,
     	"Santana do Cariri": 24,
     	"São João do Jaguaribe": 24,
@@ -292,7 +291,6 @@
     	"Varzea Alegre": 24
       }
     },
-
     {
       "nome": "Ceará Transportes",
       "valorPorKg": 0.85,
@@ -303,7 +301,6 @@
         "Piauí": 96
       }
     },
-
     {
       "nome": "Potyguar",
       "valorPorKg": 6.0,
@@ -316,7 +313,6 @@
         "Rio Grande do Norte": 96
       }
     },
-    
     {
       "nome": "Transportadora D",
       "valorPorKg": 4.8,
@@ -331,4 +327,5 @@
     }
   ]
 }
+
 
