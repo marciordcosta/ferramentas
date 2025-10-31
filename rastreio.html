@@ -12,16 +12,26 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
+      padding: 20px;
     }
+
     .container {
       background: white;
       padding: 30px;
       border-radius: 10px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       text-align: center;
+      width: 100%;
+      max-width: 600px;
     }
+
+    h2 {
+      margin-bottom: 20px;
+      color: #2c7be5;
+    }
+
     input[type="text"] {
       width: 250px;
       padding: 10px;
@@ -30,6 +40,7 @@
       border-radius: 5px;
       outline: none;
     }
+
     button {
       padding: 10px 20px;
       margin-left: 10px;
@@ -41,8 +52,25 @@
       cursor: pointer;
       transition: 0.3s;
     }
+
     button:hover {
       background-color: #1a5fcc;
+    }
+
+    #loading {
+      display: none;
+      margin-top: 15px;
+      color: #555;
+      font-size: 15px;
+    }
+
+    iframe {
+      display: none;
+      width: 100%;
+      height: 80vh;
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
     }
   </style>
 </head>
@@ -51,19 +79,33 @@
     <h2>Consulta de Nota Fiscal</h2>
     <input type="text" id="notaFiscal" placeholder="Digite o número da nota fiscal">
     <button onclick="pesquisar()">Pesquisar</button>
+
+    <div id="loading">Carregando rastreamento, aguarde...</div>
+
+    <iframe id="resultado"></iframe>
   </div>
 
   <script>
     function pesquisar() {
       const nota = document.getElementById('notaFiscal').value.trim();
+      const iframe = document.getElementById('resultado');
+      const loading = document.getElementById('loading');
+
       if (!nota) {
         alert('Por favor, digite o número da nota fiscal.');
         return;
       }
 
       const url = `https://cliente.cbirdex.com.br/rastrear/resultado?cnpj=05541695000132&tipo=remetente&notaFiscal=${nota}`;
-      window.open(url, '_blank'); // abre em nova aba
-      // se quiser abrir na mesma aba, troque por: window.location.href = url;
+
+      loading.style.display = 'block';
+      iframe.style.display = 'none';
+      iframe.src = url;
+
+      iframe.onload = () => {
+        loading.style.display = 'none';
+        iframe.style.display = 'block';
+      };
     }
   </script>
 </body>
