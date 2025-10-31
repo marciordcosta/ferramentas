@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta CNPJ + IE Sintegra</title>
+<style>
+body {font-family: Arial, sans-serif; background:#f0f2f5; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;}
+.container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); text-align:center; max-width:500px; width:90%;}
+input {width:100%; padding:10px; font-size:16px; border-radius:6px; border:1px solid #ccc; margin-bottom:15px; box-sizing:border-box;}
+button {padding:10px 15px; font-size:14px; background-color:#2c7be5; color:white; border:none; border-radius:6px; cursor:pointer; transition:0.3s; width:100%; margin-bottom:10px;}
+button:hover {background-color:#1a5fcc;}
+pre {text-align:left; background:#f3f3f3; padding:15px; border-radius:6px; max-height:300px; overflow:auto;}
+</style>
+</head>
+<body>
+<div class="container">
+<h2>Consulta CNPJ + IE</h2>
+<input type="text" id="cnpj" placeholder="Digite o CNPJ" maxlength="18" oninput="formatarCNPJ(this)">
+<button onclick="consultar()">Consultar Receita + IE</button>
+<pre id="resultado"></pre>
+</div>
+
+<script>
+// Formata CNPJ: 00.000.000/0000-00
+function formatarCNPJ(campo){
+    let valor = campo.value.replace(/\D/g,'');
+    if(valor.length>14) valor = valor.slice(0,14);
+    valor = valor.replace(/^(\d{2})(\d)/,'$1.$2');
+    valor = valor.replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3');
+    valor = valor.replace(/\.(\d{3})(\d)/,'.$1/$2');
+    valor = valor.replace(/(\d{4})(\d)/,'$1-$2');
+    campo.value = valor;
+}
+
+async function consultar(){
+    const cnpj = document.getElementById('cnpj').value.replace(/\D/g,'');
+    if(cnpj.length!==14){ alert('Digite um CNPJ válido com 14 números'); return; }
+    const resArea = document.getElementById('resultado');
+    resArea.textContent = 'Consultando...';
+
+    try{
+        // Receita via proxy (CORS)
+        const proxy = "https://api.allorigins.win/get?url=";
+        const receitaUrl = encodeURIComponent(`https://www.receitaws.com.br/v1/cnpj/${cnpj}`);
+        const receitaResp = await fetch(proxy+receitaUrl);
+        const receitaData = await receitaResp.json();
+        const json = JSON.parse(receitaData.contents);
+
+        // Mostra dados da Receita
+        let resultado = `=== Receita ===\n`;
+        resultado += `Nome: ${json.nome}\nFantasia: ${json.fantasia}\nCNPJ: ${json.cnpj}\nUF: ${json.uf}\nMunicípio: ${json.municipio}\nAtividade Principal: ${json.atividade_principal[0]?.text || ''}\n`;
+        resArea.textContent = resultado;
+
+        // Abre Sintegra em nova aba conforme UF
+        const uf = json.uf.toUpperCase();
+        switch(uf){
+            case 'AC': window.open(`http://www.sintegra.ac.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'AL': window.open(`https://sintegra.sefaz.al.gov.br/#/=${cnpj}`,'_blank'); break;
+            case 'AP': window.open(`http://www.sintegra.ap.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'AM': window.open(`http://www.sintegra.am.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'BA': window.open(`http://www.sintegra.ba.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'CE': window.open(`https://consultapublica.sefaz.ce.gov.br/sintegra/consultar?tipdocumento=2&numcnpjcgf=${cnpj}`,'_blank'); break;
+            case 'DF': window.open(`http://www.sintegra.df.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'ES': window.open(`http://www.sintegra.es.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'GO': window.open(`http://www.sintegra.go.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'MA': window.open(`http://www.sintegra.ma.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'MT': window.open(`http://www.sintegra.mt.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'MS': window.open(`http://www.sintegra.ms.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'MG': window.open(`http://www.sintegra.fazenda.mg.gov.br/consulta_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'PA': window.open(`http://www.sintegra.pa.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'PB': window.open(`http://www.sintegra.pb.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'PR': window.open(`http://www.sintegra.pr.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'PE': window.open(`http://www.sintegra.pe.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'PI': window.open(`http://www.sintegra.pi.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'RJ': window.open(`http://www.sintegra.rj.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'RN': window.open(`http://www.sintegra.rn.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'RS': window.open(`http://www.sintegra.rs.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'RO': window.open(`http://www.sintegra.ro.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'RR': window.open(`http://www.sintegra.rr.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'SC': window.open(`http://www.sintegra.sc.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'SP': window.open(`http://www.sintegra.sp.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'SE': window.open(`http://www.sintegra.se.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            case 'TO': window.open(`http://www.sintegra.to.gov.br/cad_cnpj.asp?cnpj=${cnpj}`,'_blank'); break;
+            default: alert('Sintegra não disponível para a UF: '+uf);
+        }
+
+    }catch(err){
+        resArea.textContent = 'Falha ao consultar: '+err.message;
+    }
+}
+</script>
+</body>
+</html>
