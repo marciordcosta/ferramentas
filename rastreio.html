@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consulta de Nota Fiscal</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    input[type="text"] {
+      width: 250px;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      outline: none;
+    }
+    button {
+      padding: 10px 20px;
+      margin-left: 10px;
+      font-size: 16px;
+      background-color: #2c7be5;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background-color: #1a5fcc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Consulta de Nota Fiscal</h2>
+    <input type="text" id="notaFiscal" placeholder="Digite o número da nota fiscal">
+    <button onclick="pesquisar()">Pesquisar</button>
+  </div>
+
+  <script>
+    function pesquisar() {
+      const nota = document.getElementById('notaFiscal').value.trim();
+      if (!nota) {
+        alert('Por favor, digite o número da nota fiscal.');
+        return;
+      }
+
+      const url = `https://cliente.cbirdex.com.br/rastrear/resultado?cnpj=05541695000132&tipo=remetente&notaFiscal=${nota}`;
+      window.open(url, '_blank'); // abre em nova aba
+      // se quiser abrir na mesma aba, troque por: window.location.href = url;
+    }
+  </script>
+</body>
+</html>
