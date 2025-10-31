@@ -64,6 +64,12 @@
       font-size: 15px;
     }
 
+    #fallbackBtn {
+      display: none;
+      margin-top: 15px;
+      background-color: #888;
+    }
+
     iframe {
       display: none;
       width: 100%;
@@ -75,35 +81,13 @@
   </style>
 </head>
 <body>
-
-  <a href="index.html" class="voltar-inicio">Home</a>
-<style>
-.voltar-inicio {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    background-color: #40ae1a;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 14px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transition: 0.3s;
-    z-index: 9999;
-}
-.voltar-inicio:hover {
-    background-color: #359015;
-}
-</style>
-  
   <div class="container">
     <h2>Consulta de Nota Fiscal</h2>
     <input type="text" id="notaFiscal" placeholder="Digite o número da nota fiscal">
     <button onclick="pesquisar()">Pesquisar</button>
 
     <div id="loading">Carregando rastreamento, aguarde...</div>
+    <button id="fallbackBtn" onclick="abrirFallback()">Documento não encontrado? Clique aqui</button>
 
     <iframe id="resultado"></iframe>
   </div>
@@ -113,6 +97,7 @@
       const nota = document.getElementById('notaFiscal').value.trim();
       const iframe = document.getElementById('resultado');
       const loading = document.getElementById('loading');
+      const fallbackBtn = document.getElementById('fallbackBtn');
 
       if (!nota) {
         alert('Por favor, digite o número da nota fiscal.');
@@ -120,17 +105,25 @@
       }
 
       const url = `https://cliente.cbirdex.com.br/rastrear/resultado?cnpj=05541695000132&tipo=remetente&notaFiscal=${nota}`;
-
-      loading.style.display = 'block';
-      iframe.style.display = 'none';
       iframe.src = url;
+      iframe.style.display = 'none';
+      loading.style.display = 'block';
+      fallbackBtn.style.display = 'none';
 
       iframe.onload = () => {
         loading.style.display = 'none';
         iframe.style.display = 'block';
+        // Mostra o botão de fallback após 3 segundos (tempo para ler a resposta)
+        setTimeout(() => {
+          fallbackBtn.style.display = 'inline-block';
+        }, 3000);
       };
+    }
+
+    function abrirFallback() {
+      const fallback = "https://radar.tntbrasil.com.br/radar/public/localizacaoSimplificada.do;SESSAO=?";
+      window.open(fallback, "_blank");
     }
   </script>
 </body>
 </html>
-
