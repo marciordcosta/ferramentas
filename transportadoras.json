@@ -1,0 +1,16 @@
+{
+  "transportadoras": [
+    {
+      "nome": "Cbirdex",
+      "valorPorKg": 0.45,
+      "valorPorNF": 0.005,
+      "taxaColeta": 0,
+      "freteMinimo": 60.00,
+      "prazos": {
+        "Abaiara": 24,
+        "Acarape": 24
+        // ... (restante do JSON)
+      }
+    }
+  ]
+}
