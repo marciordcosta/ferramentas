@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Gerenciador – Estilo Windows</title>
+<title>Gerenciador – Estilo Windows (Corrigido)</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#f3f6fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --primary:#2563eb; --primary-2:#1e40af;
+    --bg:#f3f6fb; --card:#ffffff; --text:#111827; --muted:#6b7280; --primary:#2563eb; --primary-2:#1e40af;
     --border:#e5e7eb; --danger:#dc2626; --ok:#16a34a;
   }
   *{box-sizing:border-box}
@@ -28,11 +28,11 @@
   .crumbs .sep{color:var(--muted)}
 
   main{padding:18px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
-  .list{display:grid;grid-template-columns:40px 1fr 120px 180px;gap:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+  .list{display:grid;grid-template-columns:40px 1fr 120px 200px;gap:10px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-  .folder-tile{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:12px;background:#fff;cursor:pointer}
-  .folder-tile:hover{outline:2px solid #dbeafe}
+  .folder-tile,.file-tile{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:12px;background:#fff;cursor:pointer}
+  .folder-tile:hover,.file-tile:hover{outline:2px solid #dbeafe}
   .icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px}
   .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .muted{color:var(--muted);font-size:12px}
@@ -41,10 +41,10 @@
 
   /* Modal */
   .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:50}
-  .modal{width:560px;max-width:95vw;background:#fff;border-radius:12px;border:1px solid var(--border)}
+  .modal{width:600px;max-width:95vw;background:#fff;border-radius:12px;border:1px solid var(--border)}
   .modal header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
   .modal .body{padding:14px}
-  .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+  .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
   .folder-mini{display:flex;gap:8px;align-items:center;border:1px solid var(--border);padding:10px;border-radius:10px;background:#fff;cursor:pointer}
   .folder-mini:hover{background:#f8fafc}
   .mini-actions{display:flex;gap:6px;margin-left:auto}
@@ -99,6 +99,7 @@
   </div>
 
 <script>
+// ====== Supabase ======
 const { createClient } = window.supabase;
 const supabase = createClient(
   'https://wnmtkoywbbzolbkoawva.supabase.co',
@@ -110,12 +111,12 @@ const OWNER='cearasementes@gmail.com';
 let currentPath=''; // raiz
 let viewMode = localStorage.getItem('viewMode') || 'grid';
 let uploadQueue = [];
-let dlgMode = 'pick'; // 'pick' para escolher destino de upload | 'manage' para apenas gerenciar
+let dlgMode = 'pick'; // 'pick' para destino de upload | 'manage' para gerenciamento
 
 const el = s=>document.querySelector(s);
 const clean = p => (p||'').replace(/^\/+|\/+$/g,'');
 
-// -------- AUTH --------
+// ====== AUTH ======
 async function ensureAuth(){
   const { data } = await supabase.auth.getSession();
   if(!data.session) return location.href='index.html';
@@ -124,7 +125,7 @@ async function ensureAuth(){
 }
 function logout(){ supabase.auth.signOut().then(()=>location.href='index.html'); }
 
-// -------- Navegação e render --------
+// ====== Navegação e render ======
 function setView(mode){ viewMode=mode; localStorage.setItem('viewMode',mode); render(); }
 function setCrumbs(){
   const bc = el('#breadcrumbs'); bc.innerHTML='';
@@ -139,14 +140,21 @@ function setCrumbs(){
 
 async function gotoFolder(prefix){ currentPath = clean(prefix||''); setCrumbs(); await render(); }
 
+// --- Listagem confiável (corrigida) ---
+// Regra: item.metadata existe => ARQUIVO; metadata ausente => PASTA
 async function listChildren(prefix){
   const { data } = await supabase.storage.from(BUCKET).list(prefix||'',{ limit:1000, sortBy:{ column:'name', order:'asc' }});
   const folders=[]; const files=[];
   for(const it of (data||[])){
     const full = clean(prefix?`${prefix}/${it.name}`:it.name);
-    const probe = await supabase.storage.from(BUCKET).list(full,{ limit:1 });
-    if(Array.isArray(probe.data)) folders.push({ name: it.name, full });
-    else if(it.name!=='.init') files.push({ name: it.name, full, size: it.metadata?.size||0, date: it.created_at||'' });
+    // it.metadata só existe para arquivos; para pastas vem undefined
+    if (it.metadata && typeof it.metadata.size === 'number') {
+      files.push({ name: it.name, full, size: it.metadata.size, date: it.updated_at || it.created_at || '' });
+    } else {
+      // proteger contra marcador .init mostrado como pasta
+      if (it.name === '.init') continue;
+      folders.push({ name: it.name, full });
+    }
   }
   return { folders, files };
 }
@@ -159,17 +167,16 @@ async function render(){
   const { folders, files } = await listChildren(currentPath);
 
   if(viewMode==='grid'){
-    // Mostra **apenas pastas** em grade, como no Windows ao abrir
+    // GRID: mostrar apenas pastas
     folders.forEach(f=>wrap.appendChild(tileFolder(f)));
     if(!folders.length){
       const msg=document.createElement('div');
       msg.className='card';
-      msg.innerHTML='<div class="muted">Nenhuma pasta aqui. Use "Nova pasta" no diálogo de seleção ao enviar arquivos.</div>';
+      msg.innerHTML='<div class="muted">Nenhuma pasta aqui. Use "Enviar arquivo" para criar destinos, ou crie pelo modal.</div>';
       wrap.appendChild(msg);
     }
   } else {
-    // Lista estilo detalhado (pastas + arquivos)
-    // Cabeçalhos
+    // LISTA: pastas + arquivos
     const hdr = document.createElement('div');
     hdr.className='list';
     hdr.innerHTML='<div></div><div class="muted">Nome</div><div class="muted">Tamanho</div><div class="muted">Ações</div>';
@@ -202,17 +209,16 @@ function rowFolder(f){
 }
 function rowFile(file){
   const row=document.createElement('div'); row.className='list card';
-  row.innerHTML=`<div>📄</div><div><strong>${file.name}</strong><div class="muted">${file.full}</div></div><div>${formatSize(file.size)}</div><div class="row-actions"><button class="ghost" onclick="downloadFile('${file.full}')">Baixar</button><button class="ghost" onclick="renameFile('${file.full}')">Ren</button><button class="danger" onclick="deleteFile('${file.full}')">Del</button></div>`;
+  row.innerHTML=`<div>📄</div><div><strong>${file.name}</strong><div class="muted">${file.full}</div></div><div>${formatSize(file.size)}</div><div class="row-actions"><button class="ghost" onclick="downloadFile('${file.full}')">Baixar</button><button class="ghost" onclick="moveFile('${file.full}')">Mover</button><button class="ghost" onclick="renameFile('${file.full}')">Ren</button><button class="danger" onclick="deleteFile('${file.full}')">Del</button></div>`;
   return row;
 }
 
 function formatSize(n){ if(!n) return '-'; const u=['B','KB','MB','GB']; let i=0; while(n>1024&&i<u.length-1){n/=1024;i++} return n.toFixed(1)+' '+u[i]; }
 
-// -------- Pastas: criar/renomear/excluir --------
+// ====== Pastas: criar/renomear/excluir ======
 async function renameFolder(full){
   const parts = full.split('/'); const old = parts.pop(); const parent = parts.join('/');
   const novo = prompt('Novo nome da pasta:', old); if(!novo||novo===old) return;
-  // mover todos os conteúdos
   const items = await listAllUnder(full);
   await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), { upsert:true });
   for(const p of items){
@@ -237,18 +243,22 @@ async function listAllUnder(prefix){
     const p=q.shift();
     const { data } = await supabase.storage.from(BUCKET).list(p,{limit:1000});
     for(const it of (data||[])){
+      if(it.name==='.init') continue;
       const full = clean(`${p}/${it.name}`);
-      const probe = await supabase.storage.from(BUCKET).list(full,{limit:1});
-      if(Array.isArray(probe.data) && probe.data.length>0){ q.push(full); continue; }
-      if(it.name!=='.init') out.push(full);
+      if (it.metadata && typeof it.metadata.size === 'number') {
+        out.push(full);
+      } else {
+        q.push(full);
+      }
     }
   }
   return out;
 }
 
-// -------- Arquivos: baixar/renomear/excluir --------
+// ====== Arquivos: baixar/renomear/excluir/mover ======
 async function downloadFile(full){
-  const { data } = await supabase.storage.from(BUCKET).download(full);
+  const { data, error } = await supabase.storage.from(BUCKET).download(full);
+  if(error){ alert('Falha ao baixar'); return; }
   const url = URL.createObjectURL(data); const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop(); a.click(); URL.revokeObjectURL(url);
 }
 async function deleteFile(full){ if(!confirm('Excluir arquivo?')) return; await supabase.storage.from(BUCKET).remove([full]); await render(); }
@@ -258,8 +268,12 @@ async function renameFile(full){
   await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`);
   await render();
 }
+function moveFile(full){
+  uploadQueue = [{name: full.split('/').pop(), __moveFrom: full}];
+  openFolderPicker('move');
+}
 
-// -------- Upload: input + drag&drop + escolher destino --------
+// ====== Upload: input + drag&drop + escolher destino ======
 function selecionarArquivos(){ el('#filePick').click(); }
 
 el('#filePick').addEventListener('change', (e)=>{
@@ -275,8 +289,7 @@ drop.addEventListener('drop', e=>{
   openFolderPicker('pick');
 });
 
-function openFolderPicker(mode){ dlgMode=mode; showDlg('Selecionar pasta de destino'); loadDlgFolders(); }
-
+function openFolderPicker(mode){ dlgMode=mode; showDlg('Selecionar pasta'); loadDlgFolders(); }
 function showDlg(title){ el('#dlgTitle').textContent=title; el('#dlg').style.display='flex'; }
 function hideDlg(){ el('#dlg').style.display='none'; }
 function closeDlg(e){ if(e.target.id==='dlg') hideDlg(); }
@@ -297,28 +310,25 @@ async function listAllFolders(){
   async function scan(prefix){
     const { data } = await supabase.storage.from(BUCKET).list(prefix||'',{limit:1000, sortBy:{column:'name',order:'asc'}});
     for(const it of (data||[])){
+      if(it.name==='.init') continue;
       const full = clean(prefix?`${prefix}/${it.name}`:it.name);
-      const probe = await supabase.storage.from(BUCKET).list(full,{limit:1});
-      if(Array.isArray(probe.data)) { out.push(full); await scan(full); }
+      if (!(it.metadata && typeof it.metadata.size === 'number')) {
+        out.push(full);
+        await scan(full);
+      }
     }
   }
   await scan('');
   return out;
 }
 
-async function criarPastaFromDlg(){
-  const name = clean(el('#newFolderName').value); if(!name) return;
-  await supabase.storage.from(BUCKET).upload(`${name}/.init`, new Blob(['']), { upsert:true });
-  el('#newFolderName').value='';
-  await loadDlgFolders(); await render();
-}
-
 async function selectFolderForAction(dest){
   if(dlgMode==='pick'){
     await doUploadTo(dest);
     hideDlg();
-  } else {
-    // reservado para modo de gerenciamento puro, se necessário
+  } else if(dlgMode==='move'){
+    await doMoveTo(dest);
+    hideDlg();
   }
 }
 
@@ -330,12 +340,24 @@ async function doUploadTo(dest){
     if(error){ alert('Falha no upload em '+path); return; }
   }
   uploadQueue=[]; el('#filePick').value='';
-  // Se o usuário estiver na pasta destino, atualiza a visão; caso contrário, mantém
   if(clean(dest)===clean(currentPath)) await render();
   alert('Upload concluído.');
 }
 
-// -------- Busca global --------
+async function doMoveTo(dest){
+  for(const item of uploadQueue){
+    const from = item.__moveFrom; if(!from) continue;
+    const name = from.split('/').pop();
+    const to = `${dest}/${name}`;
+    const { error } = await supabase.storage.from(BUCKET).move(from, to);
+    if(error){ alert('Falha ao mover '+name); return; }
+  }
+  uploadQueue=[];
+  await render();
+  alert('Movido.');
+}
+
+// ====== Busca global ======
 async function buscar(){
   const term = (el('#q').value||'').trim().toLowerCase();
   if(!term){ alert('Digite algo para buscar.'); return; }
@@ -350,10 +372,12 @@ async function listAllFilesMatching(term){
   async function scan(prefix){
     const { data } = await supabase.storage.from(BUCKET).list(prefix||'',{limit:1000});
     for(const it of (data||[])){
+      if(it.name==='.init') continue;
       const full = clean(prefix?`${prefix}/${it.name}`:it.name);
-      const probe = await supabase.storage.from(BUCKET).list(full,{limit:1});
-      if(Array.isArray(probe.data)) await scan(full); else if(it.name!=='.init'){
-        if(full.toLowerCase().includes(term)) out.push({ name: it.name, full, size: it.metadata?.size||0, date: it.created_at||'' });
+      if (it.metadata && typeof it.metadata.size === 'number') {
+        if(full.toLowerCase().includes(term)) out.push({ name: it.name, full, size: it.metadata.size, date: it.updated_at || it.created_at || '' });
+      } else {
+        await scan(full);
       }
     }
   }
@@ -361,9 +385,12 @@ async function listAllFilesMatching(term){
   return out;
 }
 
-// -------- Boot --------
+// ====== Boot ======
 (async function(){
-  await ensureAuth();
+  const { data } = await supabase.auth.getSession();
+  if(!data.session){ location.href='index.html'; return; }
+  if(data.session.user.email!==OWNER){ await supabase.auth.signOut(); location.href='index.html'; return; }
+  el('#userEmail').textContent=data.session.user.email;
   await gotoFolder('');
   setView(viewMode);
 })();
