@@ -325,39 +325,23 @@ async function renomear(bucketEnc, pathEnc) {
 }
 
 async function mover(bucketEnc, pathEnc) {
-  const srcBucket = decodeURIComponent(bucketEnc);
-  const srcPath = decodeURIComponent(pathEnc);
-  const fileName = srcPath.split("/").pop();
+  const bucket = decodeURIComponent(bucketEnc);
+  const path = decodeURIComponent(pathEnc);
+  const fileName = path.split("/").pop();
 
-  // escolher destino
-  const dstBucket = prompt(`Mover para qual bucket?\nOpções: ${BUCKETS.join(", ")}`, srcBucket);
-  if (!dstBucket || !BUCKETS.includes(dstBucket)) { alert("Bucket inválido."); return; }
+  const novaPasta = prompt("Mover para qual pasta? (Ex: Boletins/2025)", "");
+  if (novaPasta === null) return;
 
-  const dstFolder = prompt("Mover para qual pasta (pode ser nova)?", "");
-  const cleanFolder = (dstFolder || "").replace(/^\/+|\/+$/g, "");
-  const dstPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
+  const clean = novaPasta.replace(/^\/+|\/+$/g, "");
+  const newPath = clean ? `${clean}/${fileName}` : fileName;
 
-  if (dstBucket === srcBucket) {
-    // mover dentro do mesmo bucket
-    const { error } = await supabase.storage.from(srcBucket).move(srcPath, dstPath);
-    if (error) { alert("Falha ao mover."); return; }
-  } else {
-    // mover entre buckets: baixar → subir → remover
-    const { data, error: dErr } = await supabase.storage.from(srcBucket).download(srcPath);
-    if (dErr) { alert("Falha ao ler arquivo de origem."); return; }
-    const { error: uErr } = await supabase.storage.from(dstBucket).upload(dstPath, data, { upsert:true });
-    if (uErr) { alert("Falha ao gravar no destino."); return; }
-    await supabase.storage.from(srcBucket).remove([srcPath]);
+  const { error } = await supabase.storage.from(bucket).move(path, newPath);
+  if (error) {
+    alert("Falha ao mover o arquivo.");
+    return;
   }
 
-  // atualiza caches de pastas
-  if (cleanFolder) {
-    const set = foldersCache.get(dstBucket) || new Set();
-    set.add(cleanFolder);
-    foldersCache.set(dstBucket, set);
-  }
-
-  alert("Movido.");
+  alert("Arquivo movido com sucesso.");
   buscar();
 }
 
@@ -382,4 +366,5 @@ function escapeHtml(s) {
 </script>
 </body>
 </html>
+
 
