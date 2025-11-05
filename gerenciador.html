@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciador</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+body {
+    font-family: Arial;
+    background: #f5f5f5;
+    padding: 20px;
+}
+.box {
+    background: white;
+    max-width: 600px;
+    margin: auto;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+}
+input, select {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #aaa;
+    margin-bottom: 10px;
+}
+button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    background: #2c7be5;
+    color: white;
+    cursor: pointer;
+    margin-top: 10px;
+}
+.arquivo {
+    background: #eee;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+.acoes button {
+    margin-right: 5px;
+}
+</style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Gerenciador de Arquivos</h2>
+
+    <label>Enviar arquivo</label>
+    <input type="file" id="fileInput">
+
+    <label>Escolher pasta</label>
+    <select id="pastaSelect">
+        <option value="imagens">imagens</option>
+        <option value="documentos">documentos</option>
+        <option value="boletins">boletins</option>
+        <option value="outros">outros</option>
+    </select>
+
+    <button onclick="uploadFile()">Enviar</button>
+
+    <hr>
+
+    <label>Pesquisar arquivos</label>
+    <input type="text" id="busca" placeholder="Nome do arquivo">
+
+    <button onclick="buscar()">Buscar</button>
+
+    <div id="resultados"></div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk";
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+async function uploadFile() {
+    const file = document.getElementById("fileInput").files[0];
+    const pasta = document.getElementById("pastaSelect").value;
+
+    if (!file) {
+        alert("Selecione um arquivo.");
+        return;
+    }
+
+    const path = `${pasta}/${file.name}`;
+
+    const { error } = await supabase.storage.from("arquivos").upload(path, file, { upsert: true });
+
+    if (error) {
+        alert("Erro ao enviar arquivo.");
+        return;
+    }
+
+    alert("Arquivo enviado!");
+}
+
+async function buscar() {
+    const termo = document.getElementById("busca").value.toLowerCase();
+    let resultadosDiv = document.getElementById("resultados");
+    resultadosDiv.innerHTML = "";
+
+    const pastas = ["imagens", "documentos", "boletins", "outros"];
+
+    for (let pasta of pastas) {
+        const { data: lista } = await supabase.storage.from("arquivos").list(pasta);
+
+        if (!lista) continue;
+
+        lista.forEach(arq => {
+            if (arq.name.toLowerCase().includes(termo)) {
+                resultadosDiv.innerHTML += `
+                <div class="arquivo">
+                    <b>${arq.name}</b> <small>(${pasta})</small>
+                    <div class="acoes">
+                        <button onclick="baixar('${pasta}/${arq.name}')">Baixar</button>
+                        <button onclick="renomear('${pasta}/${arq.name}')">Renomear</button>
+                        <button onclick="mover('${pasta}/${arq.name}')">Mover</button>
+                        <button style="background:#d9534f" onclick="excluir('${pasta}/${arq.name}')">Excluir</button>
+                    </div>
+                </div>`;
+            }
+        });
+    }
+}
+
+async function baixar(path) {
+    const { data } = await supabase.storage.from("arquivos").download(path);
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = path.split("/").pop();
+    a.click();
+}
+
+async function excluir(path) {
+    if (!confirm("Excluir arquivo?")) return;
+
+    await supabase.storage.from("arquivos").remove([path]);
+    alert("Excluído!");
+}
+
+async function renomear(path) {
+    const novo = prompt("Novo nome:");
+    if (!novo) return;
+
+    const pasta = path.split("/")[0];
+    const novoPath = `${pasta}/${novo}`;
+
+    await mover(path, novoPath);
+}
+
+async function mover(path, novoCaminho = null) {
+    const partes = path.split("/");
+    const pastaAtual = partes[0];
+    const nomeAtual = partes[1];
+
+    if (!novoCaminho) {
+        const nova = prompt("Mover para qual pasta? (imagens, documentos, boletins, outros)");
+        if (!nova) return;
+
+        novoCaminho = `${nova}/${nomeAtual}`;
+    }
+
+    const { data } = await supabase.storage.from("arquivos").download(path);
+    await supabase.storage.from("arquivos").upload(novoCaminho, data, { upsert: true });
+    await supabase.storage.from("arquivos").remove([path]);
+
+    alert("Movido!");
+}
+</script>
+
+</body>
+</html>
