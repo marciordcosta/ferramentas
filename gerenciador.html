@@ -20,11 +20,16 @@
   .btn-ok { background:var(--ok); }
   .btn-ok:hover { background:#1e7e34; }
   .muted { color:var(--muted); font-size:12px; }
+  .item { border:1px solid #eee; border-radius:10px; padding:12px; background:#fafafa; margin-bottom:10px; }
+  .item .actions { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
   .item .actions button { padding:4px 8px; font-size:11px; }
-  .folder .ops button { padding:4px 6px; font-size:11px; }
   .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:9999; }
   .modal { width: 700px; max-width:95vw; background:#fff; border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.25); }
   .folders { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+  .folder { border:1px solid #eee; border-radius:10px; padding:10px; display:flex; align-items:center; gap:8px; cursor:pointer; background:#fafafa; }
+  .folder:hover { background:#f0f7ff; }
+  .folder .name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .folder .ops button { padding:4px 6px; font-size:11px; }
 </style>
 </head>
 <body>
@@ -62,15 +67,16 @@
 <!-- Modal de Pastas -->
 <div id="modalPastas" class="modal-backdrop" onclick="fecharPastas(event)">
   <div class="modal" onclick="event.stopPropagation()">
-    <header style="padding:10px 14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
+    <header style="padding:10px 14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
       <h3 style="margin:0;font-size:16px;">Pastas</h3>
-      <button onclick="fecharPastas()" style="background:none;color:#333;font-size:18px;">✕</button>
-    </header>
-    <div class="body" style="padding:14px;">
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;align-items:center;">
         <input id="novaPasta" type="text" placeholder="Nova pasta"/>
         <button class="btn-ok" onclick="criarPasta()">Criar</button>
+        <button onclick="fecharPastas()" style="background:none;color:#333;font-size:18px;">✕</button>
       </div>
+    </header>
+    <div class="body" style="padding:14px;">
+      <div class="muted" style="margin-bottom:8px;">Duplo clique abre a pasta. Use ✏️ para renomear e 🗑️ para excluir.</div>
       <div id="listaPastas" class="folders"></div>
     </div>
   </div>
@@ -79,86 +85,277 @@
 <script>
 // CONFIG
 const { createClient } = window.supabase;
-const supabase = createClient("https://wnmtkoywbbzolbkoawva.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk");
+const supabase = createClient(
+  "https://wnmtkoywbbzolbkoawva.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk"
+);
 const BUCKET = "Arquivos";
-let pastaAtual = "";
-let foldersIndex = new Set();
-let filesIndex = [];
+const EMAIL_PERMITIDO = "cearasementes@gmail.com";
 
-// LOGIN
+let pastaAtual = "";         // pasta selecionada para upload e listagem
+let foldersIndex = new Set(); // índice de pastas
+let filesIndex = [];          // índice de arquivos
+let moverAlvo = null;         // caminho do arquivo a ser movido
+
+// AUTH
 async function ensureAuth(){
   const { data } = await supabase.auth.getSession();
-  if(!data.session){ window.location.href="index.html"; return; }
-  if(data.session.user.email !== "cearasementes@gmail.com"){ alert("Acesso negado."); logout(); }
-  document.getElementById("userEmail").innerText = data.session.user.email;
+  const session = data?.session;
+  if(!session){ window.location.href = "index.html"; return; }
+  const email = session.user?.email;
+  if(email !== EMAIL_PERMITIDO){ alert("Acesso negado."); await supabase.auth.signOut(); window.location.href = "index.html"; return; }
+  document.getElementById("userEmail").innerText = email;
 }
-async function logout(){ await supabase.auth.signOut(); window.location.href="index.html"; }
+async function logout(){ await supabase.auth.signOut(); window.location.href = "index.html"; }
 
+// HELPERS
 function clean(p){ return (p||"").replace(/^\/+|\/+$/g,""); }
 function escapeHtml(s){ return (s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m])); }
 
-// INDEXAÇÃO RECURSIVA
-async function buildIndex(){ foldersIndex.clear(); filesIndex = []; const q=[""]; while(q.length){ const pre=q.shift(); const {data}=await supabase.storage.from(BUCKET).list(pre,{limit:1000}); if(!Array.isArray(data)) continue; for(const it of data){ const full=clean(pre?`${pre}/${it.name}`:it.name); const probe=await supabase.storage.from(BUCKET).list(full,{limit:1}); if(Array.isArray(probe.data)){ foldersIndex.add(full); q.push(full); }else filesIndex.push({path:full}); } } }
-
-// MODAL
-function abrirPastas(modoMover=false){
-  document.getElementById("modalPastas").dataset.mover = modoMover ? "1" : "0";
-  document.getElementById("modalPastas").style.display="flex";
-  carregarPastas();
-}(){ document.getElementById("modalPastas").style.display="flex"; carregarPastas(); }
-function fecharPastas(){ document.getElementById("modalPastas").style.display="none"; }
-async function carregarPastas(){ if(!foldersIndex.size) await buildIndex(); const list=[...foldersIndex].sort(); const cont=document.getElementById("listaPastas"); cont.innerHTML=""; for(const p of list){ const el=document.createElement("div"); el.className="folder"; el.ondblclick = () => {
-      const moverModo = document.getElementById("modalPastas").dataset.mover === "1";
-      if(moverModo){
-        moverParaPasta(p);
+// INDEXAÇÃO RECURSIVA (BFS)
+async function buildIndex(){
+  foldersIndex.clear();
+  filesIndex = [];
+  const queue = [""];
+  while(queue.length){
+    const prefix = queue.shift();
+    const { data: items, error } = await supabase.storage.from(BUCKET).list(prefix, { limit:1000, sortBy:{column:"name",order:"asc"} });
+    if (error || !Array.isArray(items)) continue;
+    for (const it of items){
+      const name = it?.name || "";
+      if(!name) continue;
+      const sub = clean(prefix ? `${prefix}/${name}` : name);
+      // tenta listar dentro para saber se é pasta
+      const { data: probe, error: perr } = await supabase.storage.from(BUCKET).list(sub, { limit:1 });
+      if (!perr && Array.isArray(probe) && probe.length > 0){
+        foldersIndex.add(sub);
+        queue.push(sub);
       } else {
-        pastaAtual=p;
-        document.getElementById("pastaSelecionada").textContent=p;
+        // se existir um .init dentro, considere pasta
+        const { data: marker } = await supabase.storage.from(BUCKET).list(sub, { limit:1, search: ".init" });
+        if (Array.isArray(marker) && marker.length > 0){
+          foldersIndex.add(sub);
+          queue.push(sub);
+        } else {
+          filesIndex.push({ path: sub });
+        }
+      }
+    }
+  }
+}
+
+// MODAL DE PASTAS
+function abrirPastas(modoMover=false){
+  const modal = document.getElementById("modalPastas");
+  modal.dataset.mover = modoMover ? "1" : "0";
+  modal.style.display = "flex";
+  carregarPastas();
+}
+function fecharPastas(){ document.getElementById("modalPastas").style.display = "none"; }
+
+async function carregarPastas(){
+  if(!foldersIndex.size) await buildIndex();
+  const list = [...foldersIndex].sort();
+  const cont = document.getElementById("listaPastas");
+  cont.innerHTML = "";
+  if(!list.length){ cont.innerHTML = '<div class="muted">Nenhuma pasta encontrada.</div>'; return; }
+  for(const p of list){
+    const el = document.createElement("div");
+    el.className = "folder";
+    el.ondblclick = () => {
+      const moverModo = document.getElementById("modalPastas").dataset.mover === "1";
+      if (moverModo){ moverParaPasta(p); }
+      else {
+        pastaAtual = p;
+        document.getElementById("pastaSelecionada").textContent = p;
         fecharPastas();
         listarArquivosDaPasta(p);
       }
-    };=()=>{ pastaAtual=p; document.getElementById("pastaSelecionada").textContent=p; fecharPastas(); listarArquivosDaPasta(p); }; el.innerHTML=`<div>📁</div><div class="name">${escapeHtml(p)}</div>`; cont.appendChild(el); } }
-async function criarPasta(){ let nome=clean(document.getElementById("novaPasta").value); if(!nome) return; await supabase.storage.from(BUCKET).upload(`${nome}/.init`, new Blob([""])); document.getElementById("novaPasta").value=""; await buildIndex(); carregarPastas(); }
+    };
+    el.innerHTML = `
+      <div>📁</div>
+      <div class="name" title="${escapeHtml(p)}">${escapeHtml(p)}</div>
+      <div class="ops">
+        <button class="btn-sec" title="Renomear" onclick="event.stopPropagation(); renomearPasta('${encodeURIComponent(p)}')">✏️</button>
+        <button class="btn-danger" title="Excluir" onclick="event.stopPropagation(); excluirPasta('${encodeURIComponent(p)}')">🗑️</button>
+      </div>`;
+    cont.appendChild(el);
+  }
+}
+
+async function criarPasta(){
+  let nome = clean(document.getElementById("novaPasta").value);
+  if(!nome) return;
+  const { error } = await supabase.storage.from(BUCKET).upload(`${nome}/.init`, new Blob([""], {type:"text/plain"}), { upsert:true });
+  if(error){ alert("Falha ao criar pasta."); return; }
+  document.getElementById("novaPasta").value = "";
+  await buildIndex();
+  carregarPastas();
+}
+
+async function excluirPasta(enc){
+  const pasta = decodeURIComponent(enc);
+  if(!confirm(`Excluir a pasta e todo o conteúdo?
+${pasta}`)) return;
+  const toDelete = await listAllUnder(pasta);
+  if(toDelete.length===0){ toDelete.push(`${pasta}/.init`); }
+  const { error } = await supabase.storage.from(BUCKET).remove(toDelete);
+  if(error){ alert("Falha ao excluir pasta."); return; }
+  await buildIndex();
+  carregarPastas();
+  if (pastaAtual === pasta){ pastaAtual = ""; document.getElementById("pastaSelecionada").textContent = "Nenhuma"; document.getElementById("resultados").innerHTML = ""; document.getElementById("countInfo").textContent = ""; }
+}
+
+async function renomearPasta(enc){
+  const antiga = decodeURIComponent(enc);
+  const nova = clean(prompt("Novo nome da pasta:", antiga) || "");
+  if(!nova || nova === antiga) return;
+  const items = await listAllUnder(antiga);
+  await supabase.storage.from(BUCKET).upload(`${nova}/.init`, new Blob([""], {type:"text/plain"}), { upsert:true });
+  for(const oldPath of items){
+    const rest = oldPath.substring(antiga.length+1);
+    const newPath = `${nova}/${rest}`;
+    await supabase.storage.from(BUCKET).move(oldPath, newPath);
+  }
+  await supabase.storage.from(BUCKET).remove([`${antiga}/.init`]).catch(()=>{});
+  await buildIndex();
+  carregarPastas();
+  if (pastaAtual === antiga){ pastaAtual = nova; document.getElementById("pastaSelecionada").textContent = nova; listarArquivosDaPasta(nova); }
+}
+
+async function listAllUnder(prefix){
+  const out = [];
+  const queue = [prefix];
+  while(queue.length){
+    const p = queue.shift();
+    const { data: items } = await supabase.storage.from(BUCKET).list(p, { limit:1000 });
+    if(!Array.isArray(items)) continue;
+    for(const it of items){
+      const sub = clean(`${p}/${it.name}`);
+      const { data: probe } = await supabase.storage.from(BUCKET).list(sub, { limit:1 });
+      if(Array.isArray(probe) && probe.length>0){ queue.push(sub); continue; }
+      if(it.name !== ".init") out.push(sub);
+    }
+  }
+  return out;
+}
 
 // UPLOAD
-async function uploadFile(){ const file=document.getElementById("fileInput").files[0]; if(!file){alert("Selecione um arquivo");return;} if(!pastaAtual){alert("Selecione uma pasta");return;} const path=`${pastaAtual}/${file.name}`; const {error}=await supabase.storage.from(BUCKET).upload(path,file,{upsert:true}); if(error){alert("Erro no upload");return;} alert("Enviado"); await buildIndex(); listarArquivosDaPasta(pastaAtual); }
+async function uploadFile(){
+  const file = document.getElementById("fileInput").files[0];
+  if(!file){ alert("Selecione um arquivo."); return; }
+  if(!pastaAtual){ alert("Selecione uma pasta."); return; }
+  const path = `${pastaAtual}/${file.name}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert:true });
+  if(error){ console.error(error); alert("Erro no upload. Verifique policies e nome do bucket."); return; }
+  alert("Enviado");
+  await buildIndex();
+  listarArquivosDaPasta(pastaAtual);
+}
 
-// LISTAR
-async function listarArquivosDaPasta(prefix){ const r=document.getElementById("resultados"); const c=document.getElementById("countInfo"); r.innerHTML=""; const {data}=await supabase.storage.from(BUCKET).list(prefix,{limit:1000}); const files=[]; for(const it of data){ const full=clean(`${prefix}/${it.name}`); const probe=await supabase.storage.from(BUCKET).list(full,{limit:1}); if(Array.isArray(probe.data)){ continue;} if(it.name!==".init") files.push({path:full}); } c.textContent=`${files.length} arquivo(s)`; for(const f of files) r.appendChild(renderItem(f)); }
-function renderItem(it){ const el=document.createElement("div"); el.className="item"; el.innerHTML=`<strong>${escapeHtml(it.path.split("/").pop())}</strong><div class="muted">${escapeHtml(it.path)}</div><div class="actions"><button onclick="baixar('${it.path}')">Baixar</button><button class="btn-sec" onclick="renomear('${it.path}')">Ren</button><button class="btn-sec" onclick="mover('${it.path}')">Mov</button><button class="btn-danger" onclick="excluirArquivo('${it.path}')">X</button></div>`; return el; }
+// LISTAGEM DE ARQUIVOS DA PASTA
+async function listarArquivosDaPasta(prefix){
+  const r = document.getElementById("resultados");
+  const c = document.getElementById("countInfo");
+  r.innerHTML = ""; c.textContent = "";
+  const { data: lista } = await supabase.storage.from(BUCKET).list(prefix, { limit:1000, sortBy:{column:"name", order:"asc"} });
+  if(!Array.isArray(lista) || !lista.length){ r.innerHTML = '<div class="muted">Sem arquivos nesta pasta.</div>'; return; }
+  const files = [];
+  for(const it of lista){
+    const full = clean(`${prefix}/${it.name}`);
+    const { data: probe } = await supabase.storage.from(BUCKET).list(full, { limit:1 });
+    if(Array.isArray(probe) && probe.length>0) continue; // é subpasta
+    if(it.name === ".init") continue;
+    files.push({ path: full });
+  }
+  c.textContent = `${files.length} arquivo(s)`;
+  for(const f of files){ document.getElementById("resultados").appendChild(renderItem(f)); }
+}
 
-// AÇÕES
+function renderItem(it){
+  const el = document.createElement("div");
+  el.className = "item";
+  el.innerHTML = `
+    <div><strong>${escapeHtml(it.path.split("/").pop())}</strong></div>
+    <div class="muted">${escapeHtml(it.path)}</div>
+    <div class="actions">
+      <button onclick="baixar('${encodeURIComponent(it.path)}')">Baixar</button>
+      <button class="btn-sec" onclick="renomear('${encodeURIComponent(it.path)}')">Ren</button>
+      <button class="btn-sec" onclick="mover('${encodeURIComponent(it.path)}')">Mov</button>
+      <button class="btn-danger" onclick="excluirArquivo('${encodeURIComponent(it.path)}')">X</button>
+    </div>`;
+  return el;
+}
+
+// AÇÕES DE ARQUIVO
+async function baixar(pathEnc){
+  const path = decodeURIComponent(pathEnc);
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  if(error){ alert("Falha no download."); return; }
+  const url = URL.createObjectURL(data);
+  const a = document.createElement("a"); a.href=url; a.download = path.split("/").pop(); a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function excluirArquivo(pathEnc){
+  const path = decodeURIComponent(pathEnc);
+  if(!confirm("Excluir?")) return;
+  const { error } = await supabase.storage.from(BUCKET).remove([path]);
+  if(error){ alert("Falha ao excluir."); return; }
+  await buildIndex();
+  listarArquivosDaPasta(pastaAtual);
+}
+
+async function renomear(pathEnc){
+  const oldPath = decodeURIComponent(pathEnc);
+  const nome = oldPath.split("/").pop();
+  const pasta = oldPath.replace(/\/[^/]+$/, "");
+  const novo = prompt("Novo nome", nome);
+  if(!novo || novo === nome) return;
+  const newPath = (pasta?pasta+"/":"") + novo;
+  const { error } = await supabase.storage.from(BUCKET).move(oldPath, newPath);
+  if(error){ alert("Falha ao renomear."); return; }
+  await buildIndex();
+  listarArquivosDaPasta(pastaAtual);
+}
+
+function mover(pathEnc){
+  moverAlvo = decodeURIComponent(pathEnc);
+  abrirPastas(true); // modo mover
+}
+
 async function moverParaPasta(destino){
   fecharPastas();
-  if(!moverAlvo)return;
-  destino = destino.trim();
-  if(!destino)return;
-
+  if(!moverAlvo) return;
+  destino = clean(destino);
+  if(!destino) return;
   const nome = moverAlvo.split("/").pop();
   const newPath = `${destino}/${nome}`;
-
   const { error } = await supabase.storage.from(BUCKET).move(moverAlvo, newPath);
   if(error){ alert("Falha ao mover."); return; }
-
-  alert("Movido com sucesso.");
   moverAlvo = null;
   await buildIndex();
   listarArquivosDaPasta(pastaAtual);
 }
-async function baixar(p){ const {data}=await supabase.storage.from(BUCKET).download(p); const url=URL.createObjectURL(data); const a=document.createElement("a"); a.href=url;a.download=p.split("/").pop(); a.click(); }
-async function excluirArquivo(p){ if(!confirm("Excluir?"))return; await supabase.storage.from(BUCKET).remove([p]); listarArquivosDaPasta(pastaAtual); }
-async function renomear(p){ const nome=p.split("/").pop(); const pasta=p.replace(nome,"").slice(0,-1); const novo=prompt("Novo nome",nome); if(!novo)return; await supabase.storage.from(BUCKET).move(p,`${pasta}/${novo}`); listarArquivosDaPasta(pastaAtual); }
-let moverAlvo = null;
 
-async function mover(pathEnc){
-  moverAlvo = decodeURIComponent(pathEnc);
-  abrirPastas(true); // modo seleção para mover
-}(p){ const nome=p.split("/").pop(); const pasta=prompt("Mover para:"); if(!pasta)return; await supabase.storage.from(BUCKET).move(p,`${clean(pasta)}/${nome}`); listarArquivosDaPasta(pastaAtual); }
+// BUSCA — só executa se tiver termo
+async function buscar(){
+  const termo = document.getElementById("busca").value.trim().toLowerCase();
+  const r = document.getElementById("resultados");
+  const c = document.getElementById("countInfo");
+  if(!termo){ alert("Digite algo para buscar."); return; }
+  r.innerHTML = ""; c.textContent = "";
+  if(!filesIndex.length) await buildIndex();
+  const match = filesIndex.filter(f => f.path.toLowerCase().includes(termo));
+  c.textContent = `${match.length} arquivo(s)`;
+  for(const f of match) r.appendChild(renderItem(f));
+}
 
-// BUSCA — só funciona se houver termo
-async function.buscar(){ const termo=document.getElementById("busca").value.trim().toLowerCase(); const r=document.getElementById("resultados"); const c=document.getElementById("countInfo"); if(!termo){ alert("Digite algo para buscar"); return;} r.innerHTML=""; if(!filesIndex.length) await buildIndex(); const match=filesIndex.filter(f=>f.path.toLowerCase().includes(termo)); c.textContent=`${match.length} arquivo(s)`; for(const f of match) r.appendChild(renderItem(f)); }
-
-(async function(){ await ensureAuth(); await buildIndex(); })();
+// BOOT
+(async function(){
+  await ensureAuth();
+  await buildIndex();
+})();
 </script>
 </body>
 </html>
