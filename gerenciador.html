@@ -9,22 +9,24 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <style>
+  :root { --primary:#2c7be5; --primary-2:#1a5fcc; --ok:#28a745; --danger:#d9534f; --muted:#666; }
+  *{box-sizing:border-box}
   body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:24px; }
-  .wrap { max-width: 900px; margin: 0 auto; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
   .card { background:#fff; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.08); padding:18px; margin-bottom:16px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; }
   .row > * { flex:1; min-width:220px; }
   label { font-weight:bold; font-size:13px; color:#333; display:block; margin-bottom:6px; }
   input[type="file"], input[type="text"], select { width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; }
-  button { padding:10px 14px; border:none; border-radius:8px; background:#2c7be5; color:#fff; cursor:pointer; font-weight:bold; }
-  button:hover { background:#1a5fcc; }
+  button { padding:10px 14px; border:none; border-radius:8px; background:var(--primary); color:#fff; cursor:pointer; font-weight:bold; }
+  button:hover { background:var(--primary-2); }
   .btn-sec { background:#6c757d; }
   .btn-sec:hover { background:#545b62; }
-  .btn-danger { background:#d9534f; }
+  .btn-danger { background:var(--danger); }
   .btn-danger:hover { background:#c33f3b; }
-  .btn-ok { background:#28a745; }
+  .btn-ok { background:var(--ok); }
   .btn-ok:hover { background:#1e7e34; }
-  .muted { color:#666; font-size:12px; }
+  .muted { color:var(--muted); font-size:12px; }
   .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
   .user { font-size:14px; color:#333; }
   .sair { color:#c1121f; font-weight:bold; cursor:pointer; text-decoration:none; margin-left:8px; }
@@ -34,6 +36,21 @@
   .item .path { font-size:12px; color:#666; }
   .actions { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
   .hint { font-size:12px; color:#555; margin-top:8px; }
+
+  /* Modal Pastas */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:9999; }
+  .modal { width: 700px; max-width:95vw; background:#fff; border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.25); }
+  .modal header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #eee; }
+  .modal header h3 { margin:0; font-size:16px; }
+  .modal header button { background:transparent; color:#333; font-size:20px; padding:6px 10px; }
+  .modal .body { padding:14px 16px; }
+  .folders { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+  .folder { border:1px solid #eee; border-radius:10px; padding:10px; display:flex; align-items:center; gap:10px; cursor:pointer; background:#fafafa; }
+  .folder:hover { background:#f0f7ff; }
+  .folder .name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .folder .ops { display:flex; gap:6px; }
+  .toolbar { display:flex; gap:8px; margin-bottom:10px; }
+  .toolbar input { flex:1; }
 </style>
 </head>
 <body>
@@ -41,7 +58,7 @@
   <div class="topbar">
     <div>
       <strong>Gerenciador de Arquivos</strong>
-      <span class="pill" id="guard-buckets"></span>
+      <span class="pill" id="guard-bucket"></span>
     </div>
     <div class="user">
       <span id="userEmail"></span>
@@ -57,17 +74,12 @@
         <input type="file" id="fileInput" />
       </div>
       <div>
-        <label>Bucket</label>
-        <select id="bucketSelect"></select>
-      </div>
-      <div>
-        <label>Pasta (crie ou escolha)</label>
-        <div class="row" style="gap:8px;">
-          <input type="text" id="folderInput" placeholder="Ex.: 2025, boletim-nov, fotos-campo"/>
-          <button class="btn-sec" onclick="sugerirPastas()">Sugerir</button>
+        <label>Pasta</label>
+        <div class="row" style="gap:8px; align-items:center;">
+          <input type="text" id="folderInput" placeholder="Ex.: Boletins/2025"/>
+          <button class="btn-sec" onclick="abrirPastas()">Pastas</button>
         </div>
-        <div class="muted">Digite um nome novo para criar a pasta automaticamente no upload, ou clique em “Sugerir” para listar pastas existentes.</div>
-        <div id="foldersSuggestions" class="hint"></div>
+        <div class="muted">Digite o caminho (cria automaticamente) ou clique em <b>Pastas</b> para gerenciar/selecionar.</div>
       </div>
     </div>
     <div class="row" style="align-items:flex-end;">
@@ -79,14 +91,14 @@
   <div class="card">
     <div class="row">
       <div>
-        <label>Pesquisar (em todos os buckets e pastas)</label>
-        <input type="text" id="busca" placeholder="Digite parte do nome (ex.: nota, foto, .pdf)"/>
+        <label>Pesquisar (todas as pastas)</label>
+        <input type="text" id="busca" placeholder="Qualquer termo do nome (ex.: nota, .pdf, foto)"/>
       </div>
       <div style="align-self:flex-end;">
         <button onclick="buscar()">Buscar</button>
       </div>
     </div>
-    <div class="muted">A busca faz varredura por pastas conhecidas em cada bucket. Use “Sugerir” para atualizar a lista de pastas de um bucket antes da busca, caso tenha criado pastas novas recentemente.</div>
+    <div class="muted">Busca recursiva por todas as subpastas. Duplo clique numa pasta (na janela Pastas) filtra por aquela pasta.</div>
   </div>
 
   <!-- Resultados -->
@@ -99,6 +111,24 @@
   </div>
 </div>
 
+<!-- Modal Pastas -->
+<div id="modalPastas" class="modal-backdrop" onclick="fecharPastas(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <header>
+      <h3>Pastas — Arquivos</h3>
+      <button title="Fechar" onclick="fecharPastas()">✕</button>
+    </header>
+    <div class="body">
+      <div class="toolbar">
+        <input id="novaPasta" type="text" placeholder="Nova pasta (ex.: Boletins/2025)"/>
+        <button class="btn-ok" onclick="criarPasta()">Criar</button>
+      </div>
+      <div class="muted" style="margin-bottom:8px;">Duplo clique em uma pasta para listar os arquivos dela. Use ✏️ para renomear e 🗑️ para excluir.</div>
+      <div id="listaPastas" class="folders"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // --------- CONFIG ---------
 const { createClient } = window.supabase;
@@ -106,14 +136,15 @@ const SUPABASE_URL  = "https://wnmtkoywbbzolbkoawva.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// ATENÇÃO: use exatamente os nomes dos buckets criados no Supabase.
-const BUCKETS = ["Arquivos"];
-
-// e-mail único autorizado
+// Bucket único
+const BUCKET = "Arquivos"; // use exatamente como no Supabase
 const EMAIL_PERMITIDO = "cearasementes@gmail.com";
 
-// cache simples de pastas por bucket
-const foldersCache = new Map(); // bucket -> Set(folders)
+document.getElementById("guard-bucket").textContent = `Bucket: ${BUCKET}`;
+
+// Cache de estrutura
+let foldersIndex = new Set(); // conjunto de pastas (prefixos) detectadas
+let filesIndex = [];          // lista completa de arquivos (bucket/path)
 
 // --------- AUTH GUARD ---------
 async function ensureAuth() {
@@ -130,241 +161,282 @@ async function ensureAuth() {
   document.getElementById("userEmail").innerText = email;
 }
 
-// --------- UI INIT ---------
-function initUI() {
-  const sel = document.getElementById("bucketSelect");
-  sel.innerHTML = "";
-  BUCKETS.forEach(b => {
-    const opt = document.createElement("option");
-    opt.value = b; opt.textContent = b;
-    sel.appendChild(opt);
-  });
-  document.getElementById("guard-buckets").textContent = `Buckets: ${BUCKETS.join(" • ")}`;
+async function logout() { await supabase.auth.signOut(); window.location.href = "index.html"; }
+
+// --------- HELPERS ---------
+function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m])); }
+function cleanPath(p){ return (p||"").replace(/^\/+|\/+$/g, ""); }
+
+// Detecta se um item é pasta tentando listar dentro
+async function isFolder(prefix){
+  const { data, error } = await supabase.storage.from(BUCKET).list(prefix, { limit:1 });
+  return !error && Array.isArray(data);
 }
 
-// --------- FOLDERS SUGGESTIONS ---------
-// Tenta descobrir pastas top-level de um bucket listando a raiz e pegando itens
-// que se comportam como diretórios (tentativa de listagem recursiva).
-async function listarPastasBucket(bucket) {
-  const known = new Set(foldersCache.get(bucket) || []);
-  try {
-    // lista raiz do bucket
-    const { data: root } = await supabase.storage.from(bucket).list("", { limit: 1000, sortBy: { column: "name", order: "asc" }});
-    if (Array.isArray(root)) {
-      // tenta detectar subpastas testando listagem de cada nome como prefixo
-      for (const item of root) {
-        const name = (item?.name || "").trim();
-        if (!name) continue;
-        // se conseguir listar algo dentro, tratamos como pasta
-        const { data: probe, error: probeErr } = await supabase.storage.from(bucket).list(name, { limit: 1 });
-        if (!probeErr) {
-          known.add(name);
+// Lista recursivamente todas as pastas e arquivos
+async function buildIndex(){
+  foldersIndex.clear();
+  filesIndex = [];
+  // BFS
+  const queue = [""];
+  while(queue.length){
+    const prefix = queue.shift();
+    const { data: items } = await supabase.storage.from(BUCKET).list(prefix, { limit:1000, sortBy:{column:"name",order:"asc"} });
+    if (!Array.isArray(items)) continue;
+    for (const it of items){
+      const name = it?.name || "";
+      if (!name) continue;
+      const sub = cleanPath(prefix ? `${prefix}/${name}` : name);
+      // se conseguir listar dentro, tratamos como pasta
+      const { data: probe } = await supabase.storage.from(BUCKET).list(sub, { limit:1 });
+      if (Array.isArray(probe) && probe.length>=0){
+        // Considera "pasta" se houver ao menos um item OU se existir arquivo marcador .init
+        const hasContent = (probe && probe.length>0);
+        if (hasContent) {
+          foldersIndex.add(sub);
+          queue.push(sub);
+          continue;
+        }
+        // checa marcador
+        const { data: probe2 } = await supabase.storage.from(BUCKET).list(sub, { search:".init", limit:1 });
+        if (Array.isArray(probe2) && probe2.length>0){
+          foldersIndex.add(sub);
+          queue.push(sub);
+          continue;
         }
       }
+      // caso contrário, é arquivo na "prefix"
+      filesIndex.push({ bucket: BUCKET, path: sub, name });
     }
-  } catch(e) {
-    console.warn("Falha ao listar pastas do bucket", bucket, e);
   }
-  foldersCache.set(bucket, known);
-  return Array.from(known).sort((a,b)=>a.localeCompare(b));
-}
-
-async function sugerirPastas() {
-  const bucket = document.getElementById("bucketSelect").value;
-  const list = await listarPastasBucket(bucket);
-  const cont = document.getElementById("foldersSuggestions");
-  if (!list.length) {
-    cont.innerHTML = `<span class="muted">Nenhuma pasta encontrada neste bucket. Crie digitando um nome no campo acima.</span>`;
-    return;
-  }
-  cont.innerHTML = list.map(f => `<a href="#" onclick="pickFolder('${encodeURIComponent(f)}');return false;">${escapeHtml(f)}</a>`).join(" • ");
-}
-
-function pickFolder(encoded) {
-  const name = decodeURIComponent(encoded);
-  document.getElementById("folderInput").value = name;
 }
 
 // --------- UPLOAD ---------
-async function uploadFile() {
+async function uploadFile(){
   const file = document.getElementById("fileInput").files[0];
-  const bucket = document.getElementById("bucketSelect").value;
-  let folder = (document.getElementById("folderInput").value || "").trim();
-
-  if (!file) { alert("Selecione um arquivo."); return; }
-  if (!bucket) { alert("Selecione o bucket."); return; }
-
-  // normaliza pasta (opcional)
-  if (folder.startsWith("/")) folder = folder.slice(1);
-  if (folder.endsWith("/")) folder = folder.slice(0,-1);
-
+  let folder = cleanPath(document.getElementById("folderInput").value);
+  if (!file){ alert("Selecione um arquivo."); return; }
   const path = folder ? `${folder}/${file.name}` : file.name;
-
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-  if (error) {
-    console.error(error);
-    alert("Falha no upload. Verifique as policies e o nome exato do bucket.");
-    return;
-  }
-
-  // atualiza cache da pasta
-  if (folder) {
-    const set = foldersCache.get(bucket) || new Set();
-    set.add(folder);
-    foldersCache.set(bucket, set);
-  }
-
-  alert("Arquivo enviado com sucesso.");
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert:true });
+  if (error){ console.error(error); alert("Falha no upload. Verifique policies e nome do bucket."); return; }
+  alert("Arquivo enviado.");
+  await buildIndex();
+  await listarArquivosDaPasta(folder || "");
 }
 
-// --------- BUSCA (varre pastas conhecidas dos dois buckets) ---------
-async function buscar() {
-  const termo = (document.getElementById("busca").value || "").toLowerCase().trim();
+// --------- BUSCA GLOBAL ---------
+async function buscar(){
+  const termo = (document.getElementById("busca").value||"").toLowerCase().trim();
   const resDiv = document.getElementById("resultados");
   const countInfo = document.getElementById("countInfo");
-  resDiv.innerHTML = "";
-  countInfo.textContent = "";
-
-  let encontrados = [];
-
-  for (const bucket of BUCKETS) {
-    // garante que temos pastas conhecidas (raiz inclusive)
-    const known = new Set(foldersCache.get(bucket) || []);
-    // sempre tenta raiz também
-    known.add("");
-
-    if (!known.size) {
-      await listarPastasBucket(bucket);
-    }
-
-    for (const folder of known) {
-      const { data: lista } = await supabase.storage.from(bucket).list(folder, { limit: 1000, sortBy: { column:"name", order:"asc" }});
-      if (!Array.isArray(lista)) continue;
-
-      for (const obj of lista) {
-        // ignora “itens” que sejam subpastas (vamos considerar arquivo quando tiver size > 0 ou metadata presente)
-        const name = obj?.name || "";
-        // filtra por termo
-        if (!termo || name.toLowerCase().includes(termo)) {
-          // monta caminho completo
-          const fullPath = folder ? `${folder}/${name}` : name;
-          // empilha
-          encontrados.push({ bucket, path: fullPath, name, folder });
-        }
-      }
-    }
-  }
-
-  // apresenta
-  if (!encontrados.length) {
-    resDiv.innerHTML = `<div class="muted">Nenhum arquivo encontrado.</div>`;
-    return;
-  }
-
-  countInfo.textContent = `${encontrados.length} arquivo(s)`;
-  for (const it of encontrados) {
-    const el = document.createElement("div");
-    el.className = "item";
-    el.innerHTML = `
-      <div><strong>${escapeHtml(it.name)}</strong></div>
-      <div class="path">${escapeHtml(it.bucket)} / ${escapeHtml(it.path)}</div>
-      <div class="actions">
-        <button onclick="baixar('${encodeURIComponent(it.bucket)}','${encodeURIComponent(it.path)}')">Baixar</button>
-        <button class="btn-sec" onclick="renomear('${encodeURIComponent(it.bucket)}','${encodeURIComponent(it.path)}')">Renomear</button>
-        <button class="btn-sec" onclick="mover('${encodeURIComponent(it.bucket)}','${encodeURIComponent(it.path)}')">Mover</button>
-        <button class="btn-danger" onclick="excluirArquivo('${encodeURIComponent(it.bucket)}','${encodeURIComponent(it.path)}')">Excluir</button>
-      </div>
-    `;
-    resDiv.appendChild(el);
-  }
+  resDiv.innerHTML = ""; countInfo.textContent = "";
+  if (!filesIndex.length) await buildIndex();
+  const match = filesIndex.filter(f => f.path.toLowerCase().includes(termo));
+  if (!match.length){ resDiv.innerHTML = `<div class="muted">Nenhum arquivo encontrado.</div>`; return; }
+  countInfo.textContent = `${match.length} arquivo(s)`;
+  for (const it of match){ resDiv.appendChild(renderItem(it)); }
 }
 
-// --------- AÇÕES ---------
-async function baixar(bucketEnc, pathEnc) {
-  const bucket = decodeURIComponent(bucketEnc);
+// --------- LISTAR ARQUIVOS DE UMA PASTA ---------
+async function listarArquivosDaPasta(prefix){
+  const resDiv = document.getElementById("resultados");
+  const countInfo = document.getElementById("countInfo");
+  resDiv.innerHTML = ""; countInfo.textContent = "";
+  const { data: lista } = await supabase.storage.from(BUCKET).list(prefix, { limit:1000, sortBy:{column:"name", order:"asc"} });
+  if (!Array.isArray(lista) || !lista.length){ resDiv.innerHTML = `<div class="muted">Sem arquivos nesta pasta.</div>`; return; }
+  const files = [];
+  for (const obj of lista){
+    const name = obj?.name || "";
+    const full = cleanPath(prefix ? `${prefix}/${name}` : name);
+    // Se for subpasta, ignora aqui (a navegação de pastas é via modal)
+    const { data: probe } = await supabase.storage.from(BUCKET).list(full, { limit:1 });
+    if (Array.isArray(probe) && probe.length>0){ continue; }
+    if (name === ".init") continue; // ignora marcador
+    files.push({ bucket: BUCKET, path: full, name });
+  }
+  document.getElementById("folderInput").value = prefix;
+  document.getElementById("busca").value = "";
+  document.getElementById("countInfo").textContent = `${files.length} arquivo(s)`;
+  for (const f of files){ resDiv.appendChild(renderItem(f)); }
+}
+
+function renderItem(it){
+  const el = document.createElement("div");
+  el.className = "item";
+  el.innerHTML = `
+    <div><strong>${escapeHtml(it.path.split("/").pop())}</strong></div>
+    <div class="path">${escapeHtml(BUCKET)} / ${escapeHtml(it.path)}</div>
+    <div class="actions">
+      <button onclick="baixar('${encodeURIComponent(it.path)}')">Baixar</button>
+      <button class="btn-sec" onclick="renomear('${encodeURIComponent(it.path)}')">Renomear</button>
+      <button class="btn-sec" onclick="mover('${encodeURIComponent(it.path)}')">Mover</button>
+      <button class="btn-danger" onclick="excluirArquivo('${encodeURIComponent(it.path)}')">Excluir</button>
+    </div>`;
+  return el;
+}
+
+// --------- AÇÕES DE ARQUIVO ---------
+async function baixar(pathEnc){
   const path = decodeURIComponent(pathEnc);
-  const { data, error } = await supabase.storage.from(bucket).download(path);
-  if (error) { alert("Falha no download."); return; }
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  if (error){ alert("Falha no download."); return; }
   const url = URL.createObjectURL(data);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = path.split("/").pop();
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  const a = document.createElement("a"); a.href = url; a.download = path.split("/").pop();
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-async function excluirArquivo(bucketEnc, pathEnc) {
-  const bucket = decodeURIComponent(bucketEnc);
+async function excluirArquivo(pathEnc){
   const path = decodeURIComponent(pathEnc);
-  if (!confirm(`Excluir definitivamente:\n${bucket} / ${path} ?`)) return;
-  const { error } = await supabase.storage.from(bucket).remove([path]);
-  if (error) { alert("Falha ao excluir."); return; }
+  if (!confirm(`Excluir definitivamente:
+${BUCKET} / ${path} ?`)) return;
+  const { error } = await supabase.storage.from(BUCKET).remove([path]);
+  if (error){ alert("Falha ao excluir."); return; }
   alert("Excluído.");
-  buscar();
+  await buildIndex();
+  const cur = cleanPath(document.getElementById("folderInput").value);
+  await listarArquivosDaPasta(cur);
 }
 
-async function renomear(bucketEnc, pathEnc) {
-  const bucket = decodeURIComponent(bucketEnc);
-  const path = decodeURIComponent(pathEnc);
-  const parts = path.split("/");
+async function renomear(pathEnc){
+  const oldPath = decodeURIComponent(pathEnc);
+  const parts = oldPath.split("/");
   const oldName = parts.pop();
   const folder = parts.join("/");
-
   const novo = prompt("Novo nome do arquivo:", oldName);
   if (!novo || novo === oldName) return;
-
   const newPath = folder ? `${folder}/${novo}` : novo;
-
-  // usar move dentro do mesmo bucket
-  const { error } = await supabase.storage.from(bucket).move(path, newPath);
-  if (error) { alert("Falha ao renomear."); return; }
+  const { error } = await supabase.storage.from(BUCKET).move(oldPath, newPath);
+  if (error){ alert("Falha ao renomear."); return; }
   alert("Renomeado.");
-  buscar();
+  await buildIndex();
+  await listarArquivosDaPasta(folder);
 }
 
-async function mover(bucketEnc, pathEnc) {
-  const bucket = decodeURIComponent(bucketEnc);
-  const path = decodeURIComponent(pathEnc);
-  const fileName = path.split("/").pop();
-
-  const novaPasta = prompt("Mover para qual pasta? (Ex: Boletins/2025)", "");
-  if (novaPasta === null) return;
-
-  const clean = novaPasta.replace(/^\/+|\/+$/g, "");
+async function mover(pathEnc){
+  const oldPath = decodeURIComponent(pathEnc);
+  const fileName = oldPath.split("/").pop();
+  const destino = prompt("Mover para qual pasta? (Ex.: Boletins/2025)", "");
+  if (destino===null) return;
+  const clean = cleanPath(destino);
   const newPath = clean ? `${clean}/${fileName}` : fileName;
+  const { error } = await supabase.storage.from(BUCKET).move(oldPath, newPath);
+  if (error){ alert("Falha ao mover o arquivo."); return; }
+  alert("Movido.");
+  await buildIndex();
+  const cur = cleanPath(document.getElementById("folderInput").value);
+  await listarArquivosDaPasta(cur);
+}
 
-  const { error } = await supabase.storage.from(bucket).move(path, newPath);
-  if (error) {
-    alert("Falha ao mover o arquivo.");
-    return;
+// --------- MODAL PASTAS ---------
+function abrirPastas(){ document.getElementById("modalPastas").style.display = "flex"; carregarPastas(); }
+function fecharPastas(ev){ document.getElementById("modalPastas").style.display = "none"; }
+
+async function carregarPastas(){
+  if (!foldersIndex.size) await buildIndex();
+  renderPastas(Array.from(foldersIndex).sort((a,b)=>a.localeCompare(b)));
+}
+
+function renderPastas(arr){
+  const cont = document.getElementById("listaPastas");
+  cont.innerHTML = "";
+  if (!arr.length){ cont.innerHTML = `<div class="muted">Nenhuma pasta encontrada. Crie uma acima.</div>`; return; }
+  for (const p of arr){
+    const el = document.createElement("div");
+    el.className = "folder";
+    el.ondblclick = () => { document.getElementById("folderInput").value = p; fecharPastas(); listarArquivosDaPasta(p); };
+    el.innerHTML = `
+      <div style="font-size:18px">📁</div>
+      <div class="name" title="${escapeHtml(p)}">${escapeHtml(p)}</div>
+      <div class="ops">
+        <button class="btn-sec" title="Renomear" onclick="event.stopPropagation(); renomearPasta('${encodeURIComponent(p)}')">✏️</button>
+        <button class="btn-danger" title="Excluir" onclick="event.stopPropagation(); excluirPasta('${encodeURIComponent(p)}')">🗑️</button>
+      </div>`;
+    cont.appendChild(el);
   }
-
-  alert("Arquivo movido com sucesso.");
-  buscar();
 }
 
-// --------- SESSÃO ---------
-async function logout() {
-  await supabase.auth.signOut();
-  window.location.href = "index.html";
+async function criarPasta(){
+  let nome = cleanPath(document.getElementById("novaPasta").value || "");
+  if (!nome){ nome = prompt("Nome da nova pasta:", ""); nome = cleanPath(nome); }
+  if (!nome) return;
+  const fakePath = `${nome}/.init`;
+  const { error } = await supabase.storage.from(BUCKET)
+    .upload(fakePath, new Blob([""] , { type:"text/plain"}), { upsert:true });
+  if (error){ alert("Falha ao criar pasta."); return; }
+  document.getElementById("novaPasta").value = "";
+  await buildIndex();
+  carregarPastas();
 }
 
-// --------- HELPERS ---------
-function escapeHtml(s) {
-  return (s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+async function excluirPasta(enc){
+  const pasta = decodeURIComponent(enc);
+  if (!confirm(`Excluir a pasta e todo o conteúdo?
+${pasta}`)) return;
+  // listar tudo dentro e remover
+  const toDelete = await listAllUnder(pasta);
+  if (toDelete.length===0){
+    // tentar remover marcador .init caso exista
+    toDelete.push(`${pasta}/.init`);
+  }
+  const { error } = await supabase.storage.from(BUCKET).remove(toDelete);
+  if (error){ alert("Falha ao excluir pasta."); return; }
+  alert("Pasta excluída.");
+  await buildIndex();
+  carregarPastas();
+  // se estava visualizando essa pasta, limpa lista
+  const cur = cleanPath(document.getElementById("folderInput").value);
+  if (cur === pasta){ document.getElementById("resultados").innerHTML = ""; document.getElementById("countInfo").textContent=""; }
+}
+
+async function renomearPasta(enc){
+  const antiga = decodeURIComponent(enc);
+  const nova = cleanPath(prompt("Novo nome da pasta:", antiga) || "");
+  if (!nova || nova === antiga) return;
+  // mover todos os itens de antiga/… para nova/…
+  const items = await listAllUnder(antiga);
+  // cria marcador na nova
+  await supabase.storage.from(BUCKET).upload(`${nova}/.init`, new Blob([""], {type:"text/plain"}), { upsert:true });
+  for (const oldPath of items){
+    const rest = oldPath.substring(antiga.length+1); // remove "antiga/"
+    const newPath = `${nova}/${rest}`;
+    await supabase.storage.from(BUCKET).move(oldPath, newPath);
+  }
+  // remove marcador antigo, se sobrar
+  await supabase.storage.from(BUCKET).remove([`${antiga}/.init`]).catch(()=>{});
+  alert("Pasta renomeada.");
+  await buildIndex();
+  carregarPastas();
+  // se estava visualizando antiga, troca para nova
+  const cur = cleanPath(document.getElementById("folderInput").value);
+  if (cur === antiga){ document.getElementById("folderInput").value = nova; listarArquivosDaPasta(nova); }
+}
+
+// Lista recursivamente todos os caminhos dentro de um prefixo (pasta)
+async function listAllUnder(prefix){
+  const out = [];
+  const queue = [prefix];
+  while(queue.length){
+    const p = queue.shift();
+    const { data: items } = await supabase.storage.from(BUCKET).list(p, { limit:1000 });
+    if (!Array.isArray(items)) continue;
+    for (const it of items){
+      const sub = cleanPath(`${p}/${it.name}`);
+      // checa se é subpasta
+      const { data: probe } = await supabase.storage.from(BUCKET).list(sub, { limit:1 });
+      if (Array.isArray(probe) && probe.length>0){ queue.push(sub); continue; }
+      out.push(sub);
+    }
+  }
+  return out.filter(x => x !== `${prefix}/.init`);
 }
 
 // --------- BOOT ---------
 (async function boot(){
   await ensureAuth();
-  initUI();
-  // carrega sugestões iniciais de pastas dos dois buckets (assíncrono)
-  for (const b of BUCKETS) { listarPastasBucket(b).catch(()=>{}); }
+  await buildIndex();
+  // Inicial: lista raiz (se quiser mudar, pode colocar uma pasta padrão)
+  await listarArquivosDaPasta("");
 })();
 </script>
 </body>
 </html>
-
-
