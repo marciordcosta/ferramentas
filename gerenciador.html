@@ -1,235 +1,203 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gerenciador de Arquivos</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciador Completo</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
-  :root { --primary:#2c7be5; --primary-2:#1a5fcc; --ok:#28a745; --danger:#d9534f; --muted:#666; }
-  *{box-sizing:border-box}
-  body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:24px; }
-  .wrap { max-width: 900px; margin: 0 auto; }
-  .card { background:#fff; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.08); padding:18px; margin-bottom:16px; }
-  button { padding:8px 12px; border:none; border-radius:6px; background:var(--primary); color:#fff; cursor:pointer; font-size:13px; }
-  button:hover { background:var(--primary-2); }
-  .btn-sec { background:#6c757d; }
-  .btn-sec:hover { background:#545b62; }
-  .btn-danger { background:var(--danger); }
-  .btn-danger:hover { background:#c33f3b; }
-  .btn-ok { background:var(--ok); }
-  .btn-ok:hover { background:#1e7e34; }
-  .muted { color:var(--muted); font-size:12px; }
-  .item { border:1px solid #eee; border-radius:10px; padding:12px; background:#fafafa; margin-bottom:10px; }
-  .item .actions { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
-  .item .actions button { padding:4px 8px; font-size:11px; }
-  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:9999; }
-  .modal { width: 600px; max-width:95vw; background:#fff; border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.25); }
-  .folders { display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }
-  .folder { border:1px solid #eee; border-radius:10px; padding:10px; display:flex; align-items:center; gap:8px; cursor:pointer; background:#fafafa; }
-  .folder:hover { background:#f0f7ff; }
-  .folder .name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .folder .ops button { padding:4px 6px; font-size:11px; }
+body{margin:0;background:#f4f4f4;font-family:Arial}
+#layout{display:flex;height:100vh}
+#sidebar{width:250px;background:#fff;border-right:1px solid #ddd;overflow:auto;padding:12px}
+#content{flex:1;overflow:auto;padding:20px}
+.folder{padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px}
+.folder:hover{background:#e9f2ff}
+.breadcrumb span{cursor:pointer;color:#2c7be5}
+.dragzone{border:2px dashed #aaa;padding:30px;text-align:center;border-radius:12px;background:#fafafa;margin-bottom:16px}
+.dragzone.hover{border-color:#2c7be5;background:#eef5ff}
+.item{background:#fff;padding:12px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px}
+.item .actions button{font-size:11px;padding:4px 6px}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <strong>Gerenciador de Arquivos</strong>
-    <div><span id="userEmail"></span> <a onclick="logout()" style="color:#c1121f;cursor:pointer;">sair</a></div>
-  </div>
-
-  <!-- UPLOAD SIMPLIFICADO -->
-  <div class="card">
-    <label>Selecione um arquivo</label>
-    <input type="file" id="fileInput" onchange="abrirPastasUpload()" />
-    <div class="muted" style="margin-top:6px;">Após escolher o arquivo, selecione a pasta de destino.</div>
-  </div>
-
-  <!-- BUSCA + PASTAS -->
-  <div class="card">
-    <div style="display:flex;gap:10px;">
-      <input type="text" id="busca" placeholder="Buscar arquivo..." style="flex:1;" />
-      <button onclick="buscar()">Buscar</button>
-      <button class="btn-sec" onclick="abrirPastas()">Pastas</button>
+<div id="layout">
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+        <strong>Pastas</strong>
+        <div id="sideFolders" style="margin-top:10px"></div>
+        <hr>
+        <input id="novaPasta" placeholder="Nova pasta" style="width:100%;margin-bottom:6px">
+        <button onclick="criarPasta()" style="width:100%">Criar Pasta</button>
     </div>
-  </div>
 
-  <!-- Resultados -->
-  <div class="card">
-    <strong>Resultados</strong> — <span id="countInfo"></span>
-    <div id="resultados" style="margin-top:12px;"></div>
-  </div>
-</div>
+    <!-- CONTENT -->
+    <div id="content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div id="breadcrumb" class="breadcrumb"></div>
+            <div><span id="userEmail"></span> | <a onclick="logout()" style="color:red;cursor:pointer">sair</a></div>
+        </div>
 
-<!-- MODAL DE PASTAS -->
-<div id="modalPastas" class="modal-backdrop" onclick="fecharPastas(event)">
-  <div class="modal" onclick="event.stopPropagation()">
-    <header style="padding:10px 14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;font-size:16px;">Pastas</h3>
-      <button onclick="fecharPastas()" style="background:none;color:#333;font-size:18px;">✕</button>
-    </header>
-    <div class="body" style="padding:14px;">
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <input id="novaPasta" type="text" placeholder="Nova pasta"/>
-        <button class="btn-ok" onclick="criarPasta()">Criar</button>
-      </div>
-      <div id="listaPastas" class="folders"></div>
+        <!-- DRAG AREA -->
+        <div id="dragzone" class="dragzone">Arraste arquivos aqui para enviar</div>
+
+        <!-- SEARCH + SORT -->
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <input type="text" id="busca" placeholder="Buscar arquivos..." style="flex:1;">
+            <button onclick="buscar()">Buscar</button>
+            <select id="ordenar" onchange="ordenarArquivos()">
+                <option value="nome">Nome</option>
+                <option value="data">Data</option>
+                <option value="tamanho">Tamanho</option>
+            </select>
+        </div>
+
+        <!-- FILE LIST -->
+        <div id="resultados"></div>
     </div>
-  </div>
 </div>
 
 <script>
-// CONFIG
-const { createClient } = window.supabase;
+const {createClient} = window.supabase;
 const supabase = createClient("https://wnmtkoywbbzolbkoawva.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk");
 const BUCKET = "Arquivos";
 let pastaAtual = "";
-let fileToUpload = null;
-let moverAlvo = null;
-let foldersIndex = new Set();
-let filesIndex = [];
+let arquivosDaPasta = [];
 
-// AUTH
+function clean(p){return (p||"").replace(/^\/+|\/+$/g,"")}
+
+// ---------------- AUTH ------------------
 async function ensureAuth(){
-  const { data } = await supabase.auth.getSession();
+  const {data}=await supabase.auth.getSession();
   if(!data.session) return location.href="index.html";
-  const email = data.session.user.email;
-  if(email !== "cearasementes@gmail.com"){
-    await supabase.auth.signOut();
-    return location.href="index.html";
-  }
-  userEmail.innerText=email;
+  if(data.session.user.email!=="cearasementes@gmail.com") return logout();
+  userEmail.innerText=data.session.user.email;
 }
-async function logout(){ await supabase.auth.signOut(); location.href="index.html"; }
+async function logout(){await supabase.auth.signOut();location.href="index.html"}
 
-// HELPERS
-const clean = p => (p||"").replace(/^\/+|\/+$/g,"");
-const escapeHtml = s => (s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m]));
-
-// INDEXAÇÃO
-async function buildIndex(){
-  foldersIndex.clear(); filesIndex=[];
-  const q=[""];
-  while(q.length){
-    const pre=q.shift();
-    const {data}=await supabase.storage.from(BUCKET).list(pre,{limit:1000});
-    if(!data) continue;
-    for(const it of data){
-      const full=clean(pre?`${pre}/${it.name}`:it.name);
-      const probe=await supabase.storage.from(BUCKET).list(full,{limit:1});
-      if(Array.isArray(probe.data)) foldersIndex.add(full), q.push(full);
-      else if(it.name!==".init") filesIndex.push({path:full});
-    }
-  }
-}
-
-// MODAL
-function abrirPastas(mover=false){
-  modalPastas.dataset.mode = mover ? "move" : fileToUpload ? "upload" : "open";
-  modalPastas.style.display="flex";
-  carregarPastas();
-}
-function fecharPastas(){ modalPastas.style.display="none"; }
-
+// ---------------- CARREGAR PASTAS ------------------
 async function carregarPastas(){
-  if(!foldersIndex.size) await buildIndex();
-  const cont = listaPastas;
-  cont.innerHTML="";
-  [...foldersIndex].sort().forEach(p=>{
-    const el=document.createElement("div");
-    el.className="folder";
-    el.innerHTML=`<div>📁</div><div class=name>${escapeHtml(p)}</div>`;
-    el.ondblclick=()=> selecionarPasta(p);
-    cont.appendChild(el);
+  const lado=sideFolders;
+  lado.innerHTML="";
+  const todas = await listarPastasRecursivo();
+  todas.forEach(p=>{
+    const div=document.createElement("div");
+    let nivel = p.split("/").length - 1;
+    div.className="folder";
+    div.style.paddingLeft = (nivel*16)+"px";
+    div.innerText = p;
+    div.onclick=()=>abrirPasta(p);
+    lado.appendChild(div);
   });
 }
 
-function selecionarPasta(p){
-  const mode = modalPastas.dataset.mode;
-  fecharPastas();
-  if(mode==="upload"){
-    pastaAtual=p;
-    enviarArquivo();
-  } else if(mode==="move"){
-    moverPara(p);
-  } else {
-    pastaAtual=p;
-    listarArquivosDaPasta(p);
+async function listarPastasRecursivo(){
+  let found=[];
+  async function scan(prefix){
+    const {data}=await supabase.storage.from(BUCKET).list(prefix,{limit:1000});
+    if(!data) return;
+    for(const it of data){
+      const full=clean(prefix?`${prefix}/${it.name}`:it.name);
+      const probe=await supabase.storage.from(BUCKET).list(full,{limit:1});
+      if(Array.isArray(probe.data)){
+        found.push(full);
+        await scan(full);
+      }
+    }
   }
+  await scan("");
+  return found;
 }
 
-async function criarPasta(){
-  let nome=clean(novaPasta.value);
-  if(!nome)return;
-  await supabase.storage.from(BUCKET).upload(`${nome}/.init`,new Blob([""]));
-  novaPasta.value="";
-  await buildIndex(); carregarPastas();
-}
-
-// UPLOAD
-function abrirPastasUpload(){ fileToUpload = fileInput.files[0]; abrirPastas(); }
-
-async function enviarArquivo(){
-  if(!fileToUpload || !pastaAtual){ alert("Selecione o arquivo e uma pasta"); return; }
-  const path = `${pastaAtual}/${fileToUpload.name}`;
-  const {error}=await supabase.storage.from(BUCKET).upload(path,fileToUpload,{upsert:true});
-  if(error){alert("Erro ao enviar");return;}
-  fileInput.value="";
-  fileToUpload=null;
-  await buildIndex(); listarArquivosDaPasta(pastaAtual);
-  alert("Arquivo enviado");
-}
-
-// LISTAGEM
-async function listarArquivosDaPasta(pre){
-  const r=resultados, c=countInfo;
-  r.innerHTML=""; c.textContent="";
-  const {data}=await supabase.storage.from(BUCKET).list(pre,{limit:1000});
-  const files=[];
+// ---------------- ABRIR PASTA ------------------
+async function abrirPasta(p){
+  pastaAtual = p;
+  atualizarBreadcrumb();
+  const r=resultados;
+  r.innerHTML="";
+  const {data}=await supabase.storage.from(BUCKET).list(p,{limit:1000});
+  arquivosDaPasta=[];
   for(const it of data){
-    const full=clean(`${pre}/${it.name}`);
+    const full=`${p}/${it.name}`;
     const probe=await supabase.storage.from(BUCKET).list(full,{limit:1});
-    if(Array.isArray(probe.data)) continue;
-    if(it.name!==".init") files.push({path:full});
+    if(!Array.isArray(probe.data) && it.name!==".init"){
+      arquivosDaPasta.push({path:full,name:it.name,size:it.metadata?.size||0,date:it.created_at||""});
+    }
   }
-  c.textContent=`${files.length} arquivo(s)`;
-  files.forEach(f=>r.appendChild(renderItem(f)));
+  ordenarArquivos();
 }
 
-function renderItem(it){
-  const el=document.createElement("div"); el.className="item";
-  el.innerHTML=`<strong>${escapeHtml(it.path.split("/").pop())}</strong>
-  <div class=muted>${escapeHtml(it.path)}</div>
-  <div class=actions>
-    <button onclick="baixar('${encodeURIComponent(it.path)}')">Baixar</button>
-    <button class=btn-sec onclick="renomear('${encodeURIComponent(it.path)}')">Ren</button>
-    <button class=btn-sec onclick="mover('${encodeURIComponent(it.path)}')">Mov</button>
-    <button class=btn-danger onclick="excluirArquivo('${encodeURIComponent(it.path)}')">X</button>
-  </div>`;
-  return el;
+function atualizarBreadcrumb(){
+  const bc=breadcrumb;
+  bc.innerHTML="";
+  let partes = pastaAtual.split("/");
+  let caminho="";
+  partes.forEach((p,i)=>{
+    caminho = i===0 ? p : caminho+"/"+p;
+    const span=document.createElement("span");
+    span.innerText=p;
+    span.onclick=()=>abrirPasta(caminho);
+    bc.appendChild(span);
+    if(i<partes.length-1) bc.innerHTML += " > ";
+  });
 }
 
-// AÇÕES
-async function baixar(p){ p=decodeURIComponent(p); const {data}=await supabase.storage.from(BUCKET).download(p); const a=document.createElement("a"); a.href=URL.createObjectURL(data); a.download=p.split("/").pop(); a.click(); }
-async function excluirArquivo(p){ p=decodeURIComponent(p); if(!confirm("Excluir?"))return; await supabase.storage.from(BUCKET).remove([p]); await buildIndex(); listarArquivosDaPasta(pastaAtual); }
-async function renomear(p){ p=decodeURIComponent(p); const nome=p.split("/").pop(); const pasta=p.replace(/\/[^/]+$/,""); const novo=prompt("Novo nome",nome); if(!novo)return; await supabase.storage.from(BUCKET).move(p,`${pasta}/${novo}`); await buildIndex(); listarArquivosDaPasta(pastaAtual); }
-function mover(p){ moverAlvo=decodeURIComponent(p); abrirPastas(true); }
-async function moverPara(dest){ const nome=moverAlvo.split("/").pop(); await supabase.storage.from(BUCKET).move(moverAlvo,`${dest}/${nome}`); await buildIndex(); listarArquivosDaPasta(pastaAtual); }
-
-// BUSCA
-async function buscar(){
-  const termo=busca.value.trim().toLowerCase();
-  if(!termo){alert("Digite algo para buscar");return;}
-  if(!filesIndex.length) await buildIndex();
-  const match=filesIndex.filter(f=>f.path.toLowerCase().includes(termo));
-  resultados.innerHTML="";
-  countInfo.textContent=`${match.length} arquivo(s)`;
-  match.forEach(f=>resultados.appendChild(renderItem(f)));
+// ---------------- RENDER ------------------
+function renderLista(){
+  const r=resultados;
+  r.innerHTML="";
+  arquivosDaPasta.forEach(a=>{
+    const el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=`<strong>${a.name}</strong>
+    <div class=muted>${a.path}</div>
+    <div class=actions>
+      <button onclick="baixar('${encodeURIComponent(a.path)}')">Baixar</button>
+      <button class=btn-sec onclick="renomear('${encodeURIComponent(a.path)}')">Ren</button>
+      <button class=btn-sec onclick="mover('${encodeURIComponent(a.path)}')">Mov</button>
+      <button class=btn-danger onclick="excluirArquivo('${encodeURIComponent(a.path)}')">X</button>
+    </div>`;
+    r.appendChild(el);
+  });
 }
+
+// ---------------- ORDENAR ------------------
+function ordenarArquivos(){
+  const mode = ordenar.value;
+  if(mode==="nome") arquivosDaPasta.sort((a,b)=>a.name.localeCompare(b.name));
+  if(mode==="tamanho") arquivosDaPasta.sort((a,b)=>b.size-a.size);
+  if(mode==="data") arquivosDaPasta.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  renderLista();
+}
+
+// ---------------- AÇÕES ------------------
+async function baixar(p){p=decodeURIComponent(p);const {data}=await supabase.storage.from(BUCKET).download(p);const a=document.createElement("a");a.href=URL.createObjectURL(data);a.download=p.split("/").pop();a.click();}
+async function excluirArquivo(p){p=decodeURIComponent(p);if(!confirm("Excluir?"))return;await supabase.storage.from(BUCKET).remove([p]);abrirPasta(pastaAtual);}
+async function renomear(p){p=decodeURIComponent(p);const nome=p.split("/").pop();const pasta=p.replace(/\/[^/]+$/,"");const novo=prompt("Novo nome",nome);if(!novo)return;await supabase.storage.from(BUCKET).move(p,`${pasta}/${novo}`);abrirPasta(pastaAtual);}
+function mover(p){moverAlvo=decodeURIComponent(p);abrirPastasMover();}
+
+// mover destinosync function moverPara(dest){const nome=moverAlvo.split("/").pop();await supabase.storage.from(BUCKET).move(moverAlvo,`${dest}/${nome}`);abrirPasta(pastaAtual);}
+
+// ---------------- PASTA (CRIAR / MOVER DEST) ------------------
+async function criarPasta(){let n=clean(novaPasta.value);if(!n)return;await supabase.storage.from(BUCKET).upload(`${n}/.init`,new Blob([""]));novaPasta.value="";carregarPastas();}
+
+// ---------------- BUSCA ------------------
+async function buscar(){let t=busca.value.trim().toLowerCase();if(!t){alert("Digite algo");return;}const todas=await listarArquivosGlobais();const f=todas.filter(a=>a.path.toLowerCase().includes(t));arquivosDaPasta=f;renderLista();}
+
+async function listarArquivosGlobais(){let out=[];async function scan(prefix){const {data}=await supabase.storage.from(BUCKET).list(prefix,{limit:1000});if(!data)return;for(const it of data){const full=clean(prefix?`${prefix}/${it.name}`:it.name);const probe=await supabase.storage.from(BUCKET).list(full,{limit:1});if(Array.isArray(probe.data))await scan(full);else if(it.name!==".init") out.push({path:full,name:it.name,size:it.metadata?.size||0,date:it.created_at||""});}}await scan("");return out;}
+
+// ---------------- DRAG & DROP ------------------
+const dz = dragzone;
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('hover')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('hover'));
+dz.addEventListener('drop',async e=>{
+  e.preventDefault();dz.classList.remove('hover');
+  if(!pastaAtual){alert("Abra uma pasta primeiro.");return;}
+  for(const file of e.dataTransfer.files){await supabase.storage.from(BUCKET).upload(`${pastaAtual}/${file.name}`,file,{upsert:true});}
+  abrirPasta(pastaAtual);
+});
 
 // INIT
-(async()=>{ await ensureAuth(); await buildIndex(); })();
+(async()=>{await ensureAuth();await carregarPastas();})();
 </script>
 </body>
 </html>
