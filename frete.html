@@ -78,17 +78,14 @@ button:hover {background:#1a5fcc;}
 </div>
 
 <script>
-// Puxar Transportadoras
-let dados = null;
 
+let dados = null;
+// Carregar Json
 async function carregarJSON() {
   const resp = await fetch("dados.json");
   dados = await resp.json();
   inicializar();
 }
-
-carregarJSON();
-</script>
   
 function inicializar() {
   // Gerar lista de cidades
@@ -201,9 +198,11 @@ function calcularFrete() {
 
   document.getElementById('resultado').innerHTML = html;
 }
+carregarJSON();
 </script>
 </body>
 </html>
+
 
 
 
