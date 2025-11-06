@@ -79,129 +79,200 @@ button:hover {background:#1a5fcc;}
 
 <script>
 
+<script>
+
 let dados = null;
-// Carregar Json
+
+// === Carregar JSON ===
 async function carregarJSON() {
-  const resp = await fetch("dados.json");
-  dados = await resp.json();
-  inicializar();
+  try {
+    const resp = await fetch("dados.json");
+    dados = await resp.json();
+    inicializar();
+  } catch (e) {
+    alert("Erro ao carregar dados.json");
+  }
 }
-  
+
+// === Inicialização ===
 function inicializar() {
-  // Gerar lista de cidades
-  let cidades = [];
+
   const todasCidades = new Set();
-  dados.transportadoras.forEach(t => Object.keys(t.prazos).forEach(c => todasCidades.add(c)));
-  cidades = Array.from(todasCidades).sort();
+
+  dados.transportadoras.forEach(t => {
+    Object.keys(t.prazos).forEach(c => todasCidades.add(c));
+  });
+
+  const cidades = Array.from(todasCidades).sort();
 
   setupAutocomplete(document.getElementById('cidade'), cidades);
 }
 
-// Função autocomplete
+// === Autocomplete ===
 function setupAutocomplete(inp, arr) {
   let currentFocus;
-  inp.addEventListener("input", function() {
-    let val = this.value;
+
+  inp.addEventListener("input", function () {
+
+    const val = this.value.trim();
     closeAllLists();
-    if(!val) return false;
+
+    if (!val) return;
+
     currentFocus = -1;
-    let list = document.createElement("DIV");
+
+    const list = document.createElement("div");
     list.setAttribute("id", this.id + "-autocomplete-list");
     list.setAttribute("class", "autocomplete-items");
+
     this.parentNode.appendChild(list);
+
     arr.forEach(item => {
-      if(item.substr(0,val.length).toUpperCase() == val.toUpperCase()){
-        let itemDiv = document.createElement("DIV");
-        itemDiv.innerHTML = "<strong>"+item.substr(0,val.length)+"</strong>";
+
+      if (item.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
+
+        const itemDiv = document.createElement("div");
+        itemDiv.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>";
         itemDiv.innerHTML += item.substr(val.length);
-        itemDiv.innerHTML += "<input type='hidden' value='"+item+"'>";
-        itemDiv.addEventListener("click", function(){ inp.value = this.getElementsByTagName("input")[0].value; closeAllLists(); });
+        itemDiv.innerHTML += "<input type='hidden' value='" + item + "'>";
+
+        itemDiv.addEventListener("click", function () {
+          inp.value = this.getElementsByTagName("input")[0].value;
+          closeAllLists();
+        });
+
         list.appendChild(itemDiv);
       }
+
     });
   });
-  inp.addEventListener("keydown", function(e){
+
+  inp.addEventListener("keydown", function (e) {
+
     let x = document.getElementById(this.id + "-autocomplete-list");
-    if(x) x = x.getElementsByTagName("div");
-    if(e.keyCode == 40){ currentFocus++; addActive(x); }
-    else if(e.keyCode == 38){ currentFocus--; addActive(x); }
-    else if(e.keyCode == 13){ e.preventDefault(); if(currentFocus > -1){ if(x) x[currentFocus].click(); } }
+    if (x) x = x.getElementsByTagName("div");
+
+    if (e.keyCode == 40) { // seta pra baixo
+      currentFocus++;
+      addActive(x);
+    } else if (e.keyCode == 38) { // seta pra cima
+      currentFocus--;
+      addActive(x);
+    } else if (e.keyCode == 13) { // enter
+      e.preventDefault();
+      if (currentFocus > -1) {
+        if (x) x[currentFocus].click();
+      }
+    }
   });
-  function addActive(x){ if(!x) return false; removeActive(x); if(currentFocus>=x.length) currentFocus=0; if(currentFocus<0) currentFocus=x.length-1; x[currentFocus].classList.add("autocomplete-active"); }
-  function removeActive(x){ for(let i=0;i<x.length;i++) x[i].classList.remove("autocomplete-active"); }
-  function closeAllLists(elmnt){ var x=document.getElementsByClassName("autocomplete-items"); for(var i=0;i<x.length;i++){ if(elmnt!=x[i] && elmnt!=inp) x[i].parentNode.removeChild(x[i]); } }
-  document.addEventListener("click", function(e){ closeAllLists(e.target); });
+
+  function addActive(x) {
+    if (!x) return;
+    removeActive(x);
+
+    if (currentFocus >= x.length) currentFocus = 0;
+    if (currentFocus < 0) currentFocus = x.length - 1;
+
+    x[currentFocus].classList.add("autocomplete-active");
+  }
+
+  function removeActive(x) {
+    for (let i = 0; i < x.length; i++) {
+      x[i].classList.remove("autocomplete-active");
+    }
+  }
+
+  function closeAllLists(elmnt) {
+    const items = document.getElementsByClassName("autocomplete-items");
+    for (let i = 0; i < items.length; i++) {
+      if (elmnt != items[i] && elmnt != inp) {
+        items[i].parentNode.removeChild(items[i]);
+      }
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    closeAllLists(e.target);
+  });
 }
 
-// Função para formatar prazo
-function formatPrazo(horas){
-  if(typeof horas === "string") return horas;
+// === Formatador de Prazo ===
+function formatPrazo(horas) {
+  if (typeof horas === "string") return horas;
+
   const dias = Math.floor(horas / 24);
   const restante = horas % 24;
-  let str = '';
-  if(dias > 0) str += `${dias} dia${dias>1?'s':''} `;
-  if(restante > 0) str += `${restante} hora${restante>1?'s':''}`;
+
+  let str = "";
+  if (dias > 0) str += `${dias} dia${dias > 1 ? "s" : ""} `;
+  if (restante > 0) str += `${restante} hora${restante > 1 ? "s" : ""}`;
+
   return str.trim();
 }
 
-// Cálculo de frete
+// === Cálculo de Frete ===
 function calcularFrete() {
-  const cidade = document.getElementById('cidade').value.trim();
-  const peso = parseFloat(document.getElementById('peso').value);
-  const valorMercadoria = parseFloat(document.getElementById('valor').value);
-  const ordenarPor = document.getElementById('ordenar').value;
 
-  if(!cidade || isNaN(peso) || isNaN(valorMercadoria)){ 
-    alert('Preencha corretamente todos os campos'); 
-    return; 
+  const cidade = document.getElementById("cidade").value.trim();
+  const peso = parseFloat(document.getElementById("peso").value);
+  const valorMercadoria = parseFloat(document.getElementById("valor").value);
+  const ordenarPor = document.getElementById("ordenar").value;
+
+  if (!cidade || isNaN(peso) || isNaN(valorMercadoria)) {
+    alert("Preencha corretamente todos os campos");
+    return;
   }
 
   let opcoes = dados.transportadoras.filter(t => t.prazos[cidade] !== undefined);
-  if(opcoes.length === 0){ 
-    document.getElementById('resultado').innerText = "Nenhuma transportadora atende esta cidade."; 
-    return; 
+
+  if (opcoes.length === 0) {
+    document.getElementById("resultado").innerText = "Nenhuma transportadora atende esta cidade.";
+    return;
   }
 
   opcoes.forEach(t => {
-    // cálculo do valor fixo ou percentual da NF
-    const valorNF = t.valorPorNF <= 1 ? (t.valorPorNF * valorMercadoria) : t.valorPorNF;
 
-    // taxa de coleta pode ser percentual ou fixa
+    const valorNF = t.valorPorNF <= 1 ? (t.valorPorNF * valorMercadoria) : t.valorPorNF;
     const taxaColeta = t.taxaColeta <= 1 ? (t.taxaColeta * valorMercadoria) : t.taxaColeta;
 
-    // cálculo total do frete
     let freteTotal = (t.valorPorKg * peso) + valorNF + taxaColeta;
 
-    // aplica valor mínimo, se houver
     if (t.freteMinimo && freteTotal < t.freteMinimo) {
       freteTotal = t.freteMinimo;
     }
 
     t.freteTotal = freteTotal;
     t.prazoCidade = t.prazos[cidade];
+
   });
 
-  if(ordenarPor === 'prazo'){
-    opcoes.sort((a,b) => a.prazoCidade - b.prazoCidade);
+  if (ordenarPor === "prazo") {
+    opcoes.sort((a, b) => a.prazoCidade - b.prazoCidade);
   } else {
-    opcoes.sort((a,b) => a.freteTotal - b.freteTotal);
+    opcoes.sort((a, b) => a.freteTotal - b.freteTotal);
   }
 
   let html = "<h3>Melhores transportadoras:</h3>";
-  opcoes.slice(0,3).forEach((t,i) => {
-    html += `<div class="${i===0?'melhor':''}">
-      <strong>${t.nome}</strong> - 
-      Prazo: ${formatPrazo(t.prazoCidade)} - 
-      Frete: R$ ${t.freteTotal.toFixed(2)}
-    </div>`;
+
+  opcoes.slice(0, 3).forEach((t, i) => {
+    html += `
+      <div class="${i === 0 ? 'melhor' : ''}">
+        <strong>${t.nome}</strong> — 
+        Prazo: ${formatPrazo(t.prazoCidade)} —
+        Frete: R$ ${t.freteTotal.toFixed(2)}
+      </div>`;
   });
 
-  document.getElementById('resultado').innerHTML = html;
+  document.getElementById("resultado").innerHTML = html;
 }
+
+// Iniciar
 carregarJSON();
+
 </script>
 </body>
 </html>
+
 
 
 
