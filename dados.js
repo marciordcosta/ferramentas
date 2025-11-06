@@ -2,12 +2,13 @@
   "transportadoras": [
     {
   "nome": "Cbirdex",
+  "uf": "CE",   
   "valorPorKg": 0.45,
   "valorPorNF": 0.005,
   "taxaColeta": 0,
   "freteMinimo": 60.00,
   "prazos": {
-    "Abaiara": { "uf": "CE", "prazo": 24 },
+    "Abaiara": 24,
     "Acarape": { "uf": "CE", "prazo": 24 },
     "Acarau": { "uf": "CE", "prazo": 72 },
     "Acopiara": { "uf": "CE", "prazo": 24 },
@@ -551,6 +552,7 @@
     }
   ]
 };
+
 
 
 
