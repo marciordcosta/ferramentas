@@ -84,11 +84,12 @@ button:hover {background:#1a5fcc;}
 //  CARREGAR JSON EXTERNO
 // =========================
 
-let dados = null;
+let dados = window.DADOS_FRETE;
+inicializar();
 
 async function carregarJSON() {
   try {
-    const resp = await fetch("dados.json");
+    const resp = await fetch("dados.js");
     dados = await resp.json();
     inicializar();
   } catch (e) {
@@ -282,3 +283,4 @@ carregarJSON();
 </script>
 </body>
 </html>
+
