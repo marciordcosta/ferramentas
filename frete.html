@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculadora de Frete</title>
 
-<!-- IMPORTA O JSON EM FORMATO JS -->
-<script src="dados.js"></script>
-
 <style>
 body {font-family: Arial, sans-serif; background:#f7f7f7; display:flex; justify-content:center; align-items:flex-start; padding-top:40px; margin:0;}
 .container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); max-width:600px; width:95%;}
@@ -16,25 +13,11 @@ button {padding:10px 15px; font-size:14px; margin-top:10px; border:none; border-
 button:hover {background:#1a5fcc;}
 .resultado {margin-top:20px; padding:10px; background:#f3f3f3; border-radius:6px;}
 .melhor {background-color:#d1f7c4; padding:5px; border-radius:4px; margin-bottom:5px;}
+.error {background:#ffd1d1; padding:10px; border-radius:6px; color:#7a0000; margin-top:10px;}
 
-.autocomplete-items {
-  position: absolute;
-  border: 1px solid #d4d4d4;
-  border-top: none;
-  z-index: 99;
-  top: 100%; 
-  left: 0;
-  right: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  background-color: #fff;
-}
-.autocomplete-items div {
-  padding: 10px;
-  cursor: pointer;
-  border-bottom: 1px solid #d4d4d4;
-}
-.autocomplete-active {background-color:#2c7be5 !important; color:#fff;}
+.autocomplete-items {position:absolute; border:1px solid #d4d4d4; border-top:none; z-index:99; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:#fff;}
+.autocomplete-items div {padding:10px; cursor:pointer; border-bottom:1px solid #d4d4d4;}
+.autocomplete-active {background:#2c7be5 !important; color:white;}
 
 .voltar-inicio {
     position: fixed;
@@ -47,11 +30,8 @@ button:hover {background:#1a5fcc;}
     font-size: 14px;
     z-index: 9999;
 }
-.voltar-inicio:hover {
-    color: #1a5fcc;
-}
 </style>
-</head> 
+</head>
 
 <body>
 
@@ -61,15 +41,15 @@ button:hover {background:#1a5fcc;}
   <h2>Cotação de Frete</h2>
 
   <div style="position:relative;">
-    <label for="cidade">Cidade</label>
-    <input type="text" id="cidade" placeholder="Digite a cidade">
+    <label for="cidade">Cidade ou CEP</label>
+    <input type="text" id="cidade" placeholder="Digite a cidade ou CEP">
   </div>
 
   <label for="peso">Peso total (kg)</label>
-  <input type="number" id="peso" placeholder="Ex: 100" step="0.01">
+  <input type="number" id="peso" step="0.01">
 
   <label for="valor">Valor da mercadoria (R$)</label>
-  <input type="number" id="valor" placeholder="Ex: 150.00" step="0.01">
+  <input type="number" id="valor" step="0.01">
 
   <label for="ordenar">Ordenar por</label>
   <select id="ordenar">
@@ -82,31 +62,42 @@ button:hover {background:#1a5fcc;}
   <div class="resultado" id="resultado"></div>
 </div>
 
+<script src="dados.js"></script>
+
 <script>
-// ====================================
-//   PEGA O JSON DO ARQUIVO dados.js
-// ====================================
+// ========================================
+//     Preparação inicial
+// ========================================
 let dados = window.DADOS_FRETE;
 
-// ====================================
-//   INICIALIZAÇÃO
-// ====================================
-inicializar();
+let listaBusca = [];
 
+// Carregar cidades e CEPs em lista única
 function inicializar() {
-  const todas = new Set();
+  const set = new Set();
 
-  dados.transportadoras.forEach(t =>
-    Object.keys(t.prazos).forEach(c => todas.add(c))
-  );
+  dados.transportadoras.forEach(t => {
+    Object.entries(t.prazos).forEach(([cidade, valor]) => {
+      set.add(cidade);
 
-  const cidades = Array.from(todas).sort();
-  setupAutocomplete(document.getElementById("cidade"), cidades);
+      // valor = "24 | 60000-000 a 60049-999"
+      const partes = String(valor).split("|");
+      if (partes.length > 1) {
+        const faixaCEP = partes[1].trim();
+        set.add(faixaCEP); // adiciona a faixa inteira na busca
+      }
+    });
+  });
+
+  listaBusca = Array.from(set);
+  setupAutocomplete(document.getElementById("cidade"), listaBusca);
 }
 
-// ====================================
-//   AUTOCOMPLETE
-// ====================================
+inicializar();
+
+// ========================================
+//     Autocomplete (cidade ou CEP)
+// ========================================
 function setupAutocomplete(inp, arr) {
   let currentFocus;
 
@@ -118,134 +109,154 @@ function setupAutocomplete(inp, arr) {
     currentFocus = -1;
 
     const list = document.createElement("div");
-    list.setAttribute("id", this.id + "-autocomplete-list");
-    list.setAttribute("class", "autocomplete-items");
+    list.className = "autocomplete-items";
+    list.id = this.id + "-autocomplete-list";
     this.parentNode.appendChild(list);
 
     arr.forEach(item => {
-      if (item.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
+      if (item.toUpperCase().includes(val.toUpperCase())) {
         const div = document.createElement("div");
-        div.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>" + item.substr(val.length);
+        div.innerHTML = item;
         div.innerHTML += "<input type='hidden' value='" + item + "'>";
 
-        div.addEventListener("click", function () {
+        div.onclick = function () {
           inp.value = this.getElementsByTagName("input")[0].value;
           closeAllLists();
-        });
+        };
 
         list.appendChild(div);
       }
     });
   });
 
-  inp.addEventListener("keydown", function (e) {
-    let x = document.getElementById(this.id + "-autocomplete-list");
-    if (x) x = x.getElementsByTagName("div");
-
-    if (e.keyCode == 40) {
-      currentFocus++;
-      addActive(x);
-    } else if (e.keyCode == 38) {
-      currentFocus--;
-      addActive(x);
-    } else if (e.keyCode == 13) {
-      e.preventDefault();
-      if (currentFocus > -1 && x) x[currentFocus].click();
-    }
-  });
-
-  function addActive(x) {
-    if (!x) return;
-    removeActive(x);
-    if (currentFocus >= x.length) currentFocus = 0;
-    if (currentFocus < 0) currentFocus = x.length - 1;
-
-    x[currentFocus].classList.add("autocomplete-active");
-  }
-
-  function removeActive(x) {
-    for (let i = 0; i < x.length; i++) x[i].classList.remove("autocomplete-active");
-  }
-
-  function closeAllLists(elmnt) {
-    const items = document.getElementsByClassName("autocomplete-items");
-    for (let item of items) {
-      if (elmnt !== item && elmnt !== inp) {
-        item.parentNode.removeChild(item);
-      }
-    }
-  }
-
   document.addEventListener("click", function (e) {
     closeAllLists(e.target);
   });
+
+  function closeAllLists(elmnt) {
+    const items = document.getElementsByClassName("autocomplete-items");
+    for (let i = 0; i < items.length; i++) {
+      if (elmnt !== items[i] && elmnt !== inp) {
+        items[i].remove();
+      }
+    }
+  }
 }
 
-// ====================================
-//   FORMATAR PRAZO
-// ====================================
-function formatPrazo(horas) {
-  if (typeof horas === "string") return horas;
-
-  const dias = Math.floor(horas / 24);
-  const h = horas % 24;
-
-  let str = "";
-  if (dias > 0) str += `${dias} dia${dias > 1 ? "s" : ""} `;
-  if (h > 0) str += `${h} hora${h > 1 ? "s" : ""}`;
-
-  return str.trim();
+// ========================================
+//     Função auxiliar: validar CEP
+// ========================================
+function dentroFaixa(cep, faixa) {
+  // "60000-000 a 60049-999"
+  const partes = faixa.split("a");
+  if (partes.length !== 2) return false;
+  const ini = partes[0].trim().replace("-", "");
+  const fim = partes[1].trim().replace("-", "");
+  const num = cep.replace("-", "");
+  return num >= ini && num <= fim;
 }
 
-// ====================================
-//   CALCULAR FRETE
-// ====================================
+
+// ========================================
+//     Cálculo principal
+// ========================================
 function calcularFrete() {
-  const cidade = document.getElementById("cidade").value.trim();
+
+  const entrada = document.getElementById("cidade").value.trim();
   const peso = parseFloat(document.getElementById("peso").value);
   const valor = parseFloat(document.getElementById("valor").value);
-  const ordenar = document.getElementById("ordenar").value;
 
-  if (!cidade || isNaN(peso) || isNaN(valor)) {
-    alert("Preencha corretamente todos os campos");
+  if (!entrada || isNaN(peso) || isNaN(valor)) {
+    alert("Preencha todos os campos");
     return;
   }
 
-  let opcoes = dados.transportadoras.filter(t => t.prazos[cidade] !== undefined);
+  const apenasNumeros = entrada.replace(/\D/g, "");
+  const consultaCEP = apenasNumeros.length === 8;
 
-  if (opcoes.length === 0) {
-    document.getElementById("resultado").innerText = "Nenhuma transportadora atende esta cidade.";
-    return;
-  }
+  // -------------------------------
+  // 1) Procurar por cidade exata
+  // -------------------------------
+  let encontrados = [];
 
-  opcoes.forEach(t => {
-    const valorNF = t.valorPorNF <= 1 ? (t.valorPorNF * valor) : t.valorPorNF;
-    const coleta = t.taxaColeta <= 1 ? (t.taxaColeta * valor) : t.taxaColeta;
-    let total = (t.valorPorKg * peso) + valorNF + coleta;
-
-    if (t.freteMinimo && total < t.freteMinimo) total = t.freteMinimo;
-
-    t.freteTotal = total;
-    t.prazoCidade = t.prazos[cidade];
+  dados.transportadoras.forEach(t => {
+    Object.entries(t.prazos).forEach(([cidade, info]) => {
+      if (cidade.toUpperCase() === entrada.toUpperCase()) {
+        encontrados.push({ t, cidade, info });
+      }
+    });
   });
 
-  if (ordenar === "prazo") opcoes.sort((a, b) => a.prazoCidade - b.prazoCidade);
-  else opcoes.sort((a, b) => a.freteTotal - b.freteTotal);
+  // -------------------------------
+  // 2) Procurar por CEP
+  // -------------------------------
+  if (consultaCEP && encontrados.length === 0) {
+    dados.transportadoras.forEach(t => {
+      Object.entries(t.prazos).forEach(([cidade, info]) => {
+        const partes = String(info).split("|");
+        if (partes.length > 1) {
+          const faixa = partes[1].trim();
+          if (dentroFaixa(entrada, faixa)) {
+            encontrados.push({ t, cidade, info });
+          }
+        }
+      });
+    });
+  }
 
+  // -------------------------------
+  // Nenhum resultado
+  // -------------------------------
+  if (encontrados.length === 0) {
+    document.getElementById("resultado").innerHTML =
+      `<div class="error">Cidade não encontrada.</div>`;
+    return;
+  }
+
+  // -------------------------------
+  // Cálculo
+  // -------------------------------
+  let opcoes = [];
+
+  encontrados.forEach(e => {
+    const prazo = String(e.info).split("|")[0].trim();
+    const prazoNumero = isNaN(parseInt(prazo)) ? 9999 : parseInt(prazo);
+
+    const valorNF = e.t.valorPorNF <= 1 ? (e.t.valorPorNF * valor) : e.t.valorPorNF;
+    const taxaColeta = e.t.taxaColeta <= 1 ? (e.t.taxaColeta * valor) : e.t.taxaColeta;
+
+    let total = (e.t.valorPorKg * peso) + valorNF + taxaColeta;
+    if (total < e.t.freteMinimo) total = e.t.freteMinimo;
+
+    opcoes.push({
+      nome: e.t.nome,
+      prazo,
+      prazoNum: prazoNumero,
+      total
+    });
+  });
+
+  // Ordenação
+  const ordenar = document.getElementById("ordenar").value;
+  if (ordenar === "prazo") opcoes.sort((a,b)=>a.prazoNum-b.prazoNum);
+  else opcoes.sort((a,b)=>a.total-b.total);
+
+  // Render
   let html = "<h3>Melhores transportadoras:</h3>";
 
-  opcoes.slice(0, 3).forEach((t, i) => {
+  opcoes.slice(0, 3).forEach((o, i) => {
     html += `
-      <div class="${i === 0 ? "melhor" : ""}">
-        <strong>${t.nome}</strong> —
-        Prazo: ${formatPrazo(t.prazoCidade)} —
-        Frete: R$ ${t.freteTotal.toFixed(2)}
+      <div class="${i===0?'melhor':''}">
+        <strong>${o.nome}</strong> — 
+        Prazo: ${o.prazo} — 
+        Frete: R$ ${o.total.toFixed(2)}
       </div>
     `;
   });
 
   document.getElementById("resultado").innerHTML = html;
 }
+
 </script>
 </body>
 </html>
