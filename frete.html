@@ -1,38 +1,24 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Calculadora de Frete</title>
-
 <style>
-body {font-family: Arial, sans-serif; background:#f7f7f7; display:flex; justify-content:center; align-items:flex-start; padding-top:40px; margin:0;}
-.container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); max-width:600px; width:95%;}
-input, select {width:100%; padding:10px; margin:5px 0 15px; border-radius:6px; border:1px solid #ccc; font-size:16px;}
-button {padding:10px 15px; font-size:14px; margin-top:10px; border:none; border-radius:6px; background:#2c7be5; color:white; cursor:pointer;}
-button:hover {background:#1a5fcc;}
-.resultado {margin-top:20px; padding:10px; background:#f3f3f3; border-radius:6px;}
-.melhor {background-color:#d1f7c4; padding:5px; border-radius:4px; margin-bottom:5px;}
-.error {background:#ffd1d1; padding:10px; border-radius:6px; color:#7a0000; margin-top:10px;}
-
-.autocomplete-items {position:absolute; border:1px solid #d4d4d4; border-top:none; z-index:99; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:#fff;}
-.autocomplete-items div {padding:10px; cursor:pointer; border-bottom:1px solid #d4d4d4;}
-.autocomplete-active {background:#2c7be5 !important; color:white;}
-
-.voltar-inicio {
-    position: fixed;
-    top: 10px;
-    left: 20px;
-    color: #2c7be5;
-    padding: 8px 12px;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 14px;
-    z-index: 9999;
-}
+  body {font-family: Arial, sans-serif; background:#f7f7f7; margin:0; padding:40px 0; display:flex; justify-content:center;}
+  .container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); max-width:600px; width:95%;}
+  input, select {width:100%; padding:10px; margin:5px 0 15px; border-radius:6px; border:1px solid #ccc; font-size:16px;}
+  button {padding:10px 15px; font-size:14px; margin-top:10px; border:none; border-radius:6px; background:#2c7be5; color:white; cursor:pointer;}
+  button:hover {background:#1a5fcc;}
+  .resultado {margin-top:20px; padding:10px; background:#f3f3f3; border-radius:6px;}
+  .melhor {background:#d1f7c4; padding:6px; border-radius:4px; margin-bottom:5px;}
+  .voltar-inicio {position: fixed; top:10px; left:20px; color:#2c7be5; text-decoration:none; font-weight:bold; font-size:14px;}
+  .voltar-inicio:hover {color:#1a5fcc;}
+  .autocomplete-items {position:absolute; border:1px solid #d4d4d4; border-top:none; z-index:99; background:#fff; max-height:200px; overflow-y:auto; width:100%;}
+  .autocomplete-items div{padding:10px; cursor:pointer; border-bottom:1px solid #d4d4d4;}
+  .autocomplete-active{background:#2c7be5 !important; color:#fff;}
 </style>
 </head>
-
 <body>
 
 <a href="index.html" class="voltar-inicio">Voltar</a>
@@ -41,15 +27,15 @@ button:hover {background:#1a5fcc;}
   <h2>Cotação de Frete</h2>
 
   <div style="position:relative;">
-    <label for="cidade">Cidade ou CEP</label>
+    <label for="cidade">Cidade</label>
     <input type="text" id="cidade" placeholder="Digite a cidade ou CEP">
   </div>
 
   <label for="peso">Peso total (kg)</label>
-  <input type="number" id="peso" step="0.01">
+  <input type="number" id="peso" placeholder="Ex: 100" step="0.01">
 
   <label for="valor">Valor da mercadoria (R$)</label>
-  <input type="number" id="valor" step="0.01">
+  <input type="number" id="valor" placeholder="Ex: 150.00" step="0.01">
 
   <label for="ordenar">Ordenar por</label>
   <select id="ordenar">
@@ -63,200 +49,157 @@ button:hover {background:#1a5fcc;}
 </div>
 
 <script src="dados.js"></script>
-
 <script>
-// ========================================
-//     Preparação inicial
-// ========================================
 let dados = window.DADOS_FRETE;
+let cidadesIndex = {};
+let cepsIndex = [];
 
-let listaBusca = [];
+function inicializar(){
+  const setCidades = new Set();
 
-// Carregar cidades e CEPs em lista única
-function inicializar() {
-  const set = new Set();
+  dados.transportadoras.forEach(t=>{
+    Object.entries(t.prazos).forEach(([cidade, cfg])=>{
+      setCidades.add(cidade);
+      cidadesIndex[cidade.toLowerCase()] = cidade;
 
-  dados.transportadoras.forEach(t => {
-    Object.entries(t.prazos).forEach(([cidade, valor]) => {
-      set.add(cidade);
-
-      // valor = "24 | 60000-000 a 60049-999"
-      const partes = String(valor).split("|");
-      if (partes.length > 1) {
-        const faixaCEP = partes[1].trim();
-        set.add(faixaCEP); // adiciona a faixa inteira na busca
+      if(cfg.cep_inicio && cfg.cep_fim){
+        cepsIndex.push({
+          cidade,
+          inicio: cfg.cep_inicio.replace(/\D/g,""),
+          fim: cfg.cep_fim.replace(/\D/g,"")
+        });
       }
     });
   });
 
-  listaBusca = Array.from(set);
-  setupAutocomplete(document.getElementById("cidade"), listaBusca);
+  setupAutocomplete(document.getElementById("cidade"), Array.from(setCidades).sort());
 }
 
-inicializar();
+function buscarCidadeOuCep(valor){
+  valor = valor.trim();
+  if(!valor) return null;
 
-// ========================================
-//     Autocomplete (cidade ou CEP)
-// ========================================
-function setupAutocomplete(inp, arr) {
-  let currentFocus;
-
-  inp.addEventListener("input", function () {
-    const val = this.value.trim();
-    closeAllLists();
-    if (!val) return;
-
-    currentFocus = -1;
-
-    const list = document.createElement("div");
-    list.className = "autocomplete-items";
-    list.id = this.id + "-autocomplete-list";
-    this.parentNode.appendChild(list);
-
-    arr.forEach(item => {
-      if (item.toUpperCase().includes(val.toUpperCase())) {
-        const div = document.createElement("div");
-        div.innerHTML = item;
-        div.innerHTML += "<input type='hidden' value='" + item + "'>";
-
-        div.onclick = function () {
-          inp.value = this.getElementsByTagName("input")[0].value;
-          closeAllLists();
-        };
-
-        list.appendChild(div);
-      }
-    });
-  });
-
-  document.addEventListener("click", function (e) {
-    closeAllLists(e.target);
-  });
-
-  function closeAllLists(elmnt) {
-    const items = document.getElementsByClassName("autocomplete-items");
-    for (let i = 0; i < items.length; i++) {
-      if (elmnt !== items[i] && elmnt !== inp) {
-        items[i].remove();
+  if(/^[0-9]{5}-?[0-9]{3}$/.test(valor)){
+    let limpo = valor.replace(/\D/g,"");
+    for(const faixa of cepsIndex){
+      if(limpo >= faixa.inicio && limpo <= faixa.fim){
+        return faixa.cidade;
       }
     }
-  }
-}
-
-// ========================================
-//     Função auxiliar: validar CEP
-// ========================================
-function dentroFaixa(cep, faixa) {
-  // "60000-000 a 60049-999"
-  const partes = faixa.split("a");
-  if (partes.length !== 2) return false;
-  const ini = partes[0].trim().replace("-", "");
-  const fim = partes[1].trim().replace("-", "");
-  const num = cep.replace("-", "");
-  return num >= ini && num <= fim;
-}
-
-
-// ========================================
-//     Cálculo principal
-// ========================================
-function calcularFrete() {
-
-  const entrada = document.getElementById("cidade").value.trim();
-  const peso = parseFloat(document.getElementById("peso").value);
-  const valor = parseFloat(document.getElementById("valor").value);
-
-  if (!entrada || isNaN(peso) || isNaN(valor)) {
-    alert("Preencha todos os campos");
-    return;
+    return null;
   }
 
-  const apenasNumeros = entrada.replace(/\D/g, "");
-  const consultaCEP = apenasNumeros.length === 8;
+  return cidadesIndex[valor.toLowerCase()] || null;
+}
 
-  // -------------------------------
-  // 1) Procurar por cidade exata
-  // -------------------------------
-  let encontrados = [];
+function setupAutocomplete(inp, arr){
+  let currentFocus;
 
-  dados.transportadoras.forEach(t => {
-    Object.entries(t.prazos).forEach(([cidade, info]) => {
-      if (cidade.toUpperCase() === entrada.toUpperCase()) {
-        encontrados.push({ t, cidade, info });
+  inp.addEventListener("input", function(){
+    const val = this.value;
+    closeAllLists();
+    if(!val) return;
+
+    const list = document.createElement("div");
+    list.setAttribute("id", this.id+"-autocomplete-list");
+    list.setAttribute("class", "autocomplete-items");
+    this.parentNode.appendChild(list);
+
+    arr.forEach(item=>{
+      if(item.toLowerCase().startsWith(val.toLowerCase())){
+        const itemDiv = document.createElement("div");
+        itemDiv.innerHTML = `<strong>${item.substr(0,val.length)}</strong>${item.substr(val.length)}`;
+        itemDiv.innerHTML += `<input type='hidden' value='${item}'>`;
+        itemDiv.onclick = () => { inp.value=item; closeAllLists(); };
+        list.appendChild(itemDiv);
       }
     });
   });
 
-  // -------------------------------
-  // 2) Procurar por CEP
-  // -------------------------------
-  if (consultaCEP && encontrados.length === 0) {
-    dados.transportadoras.forEach(t => {
-      Object.entries(t.prazos).forEach(([cidade, info]) => {
-        const partes = String(info).split("|");
-        if (partes.length > 1) {
-          const faixa = partes[1].trim();
-          if (dentroFaixa(entrada, faixa)) {
-            encontrados.push({ t, cidade, info });
-          }
-        }
-      });
-    });
-  }
+  inp.addEventListener("keydown", function(e){
+    let x=document.getElementById(this.id+"-autocomplete-list");
+    if(x) x=x.getElementsByTagName("div");
 
-  // -------------------------------
-  // Nenhum resultado
-  // -------------------------------
-  if (encontrados.length === 0) {
-    document.getElementById("resultado").innerHTML =
-      `<div class="error">Cidade não encontrada.</div>`;
+    if(e.keyCode===40){ currentFocus++; addActive(x); }
+    else if(e.keyCode===38){ currentFocus--; addActive(x); }
+    else if(e.keyCode===13){ e.preventDefault(); if(currentFocus>-1 && x){ x[currentFocus].click(); }}
+  });
+
+  function addActive(x){ if(!x) return; removeActive(x);
+    if(currentFocus>=x.length) currentFocus=0;
+    if(currentFocus<0) currentFocus=x.length-1;
+    x[currentFocus].classList.add("autocomplete-active");
+  }
+  function removeActive(x){ for(let i=0;i<x.length;i++) x[i].classList.remove("autocomplete-active"); }
+  function closeAllLists(elmnt){
+    const items=document.getElementsByClassName("autocomplete-items");
+    for(let i=0;i<items.length;i++){
+      if(elmnt!=items[i] && elmnt!=inp){ items[i].parentNode.removeChild(items[i]); }
+    }
+  }
+  document.addEventListener("click", e=>closeAllLists(e.target));
+}
+
+function formatPrazo(cfg){ return cfg.prazo + "h | " + cfg.cep_inicio + " a " + cfg.cep_fim; }
+
+function calcularFrete(){
+  let entrada = document.getElementById("cidade").value.trim();
+  const cidade = buscarCidadeOuCep(entrada);
+
+  if(!cidade){
+    document.getElementById("resultado").innerHTML = "⚠️ Cidade ou CEP não encontrado";
     return;
   }
 
-  // -------------------------------
-  // Cálculo
-  // -------------------------------
+  const peso = parseFloat(document.getElementById("peso").value);
+  const valorMercadoria = parseFloat(document.getElementById("valor").value);
+  const ordenarPor = document.getElementById("ordenar").value;
+
+  if(isNaN(peso) || isNaN(valorMercadoria)){
+    alert("Preencha peso e valor corretamente");
+    return;
+  }
+
   let opcoes = [];
 
-  encontrados.forEach(e => {
-    const prazo = String(e.info).split("|")[0].trim();
-    const prazoNumero = isNaN(parseInt(prazo)) ? 9999 : parseInt(prazo);
+  dados.transportadoras.forEach(t=>{
+    const cfg = t.prazos[cidade];
+    if(cfg){
+      const valorNF = t.valorPorNF <= 1 ? t.valorPorNF*valorMercadoria : t.valorPorNF;
+      const taxa = t.taxaColeta <= 1 ? t.taxaColeta*valorMercadoria : t.taxaColeta;
+      let total = (t.valorPorKg*peso) + valorNF + taxa;
 
-    const valorNF = e.t.valorPorNF <= 1 ? (e.t.valorPorNF * valor) : e.t.valorPorNF;
-    const taxaColeta = e.t.taxaColeta <= 1 ? (e.t.taxaColeta * valor) : e.t.taxaColeta;
+      if(t.freteMinimo && total < t.freteMinimo) total = t.freteMinimo;
 
-    let total = (e.t.valorPorKg * peso) + valorNF + taxaColeta;
-    if (total < e.t.freteMinimo) total = e.t.freteMinimo;
-
-    opcoes.push({
-      nome: e.t.nome,
-      prazo,
-      prazoNum: prazoNumero,
-      total
-    });
+      opcoes.push({
+        nome: t.nome,
+        prazo: cfg.prazo,
+        faixa: cfg,
+        valor: total
+      });
+    }
   });
 
-  // Ordenação
-  const ordenar = document.getElementById("ordenar").value;
-  if (ordenar === "prazo") opcoes.sort((a,b)=>a.prazoNum-b.prazoNum);
-  else opcoes.sort((a,b)=>a.total-b.total);
+  if(opcoes.length===0){
+    document.getElementById("resultado").innerText = "Nenhuma transportadora atende esta cidade.";
+    return;
+  }
 
-  // Render
+  if(ordenarPor==="prazo") opcoes.sort((a,b)=>a.prazo-b.prazo);
+  else opcoes.sort((a,b)=>a.valor-b.valor);
+
   let html = "<h3>Melhores transportadoras:</h3>";
-
-  opcoes.slice(0, 3).forEach((o, i) => {
-    html += `
-      <div class="${i===0?'melhor':''}">
-        <strong>${o.nome}</strong> — 
-        Prazo: ${o.prazo} — 
-        Frete: R$ ${o.total.toFixed(2)}
-      </div>
-    `;
+  opcoes.slice(0,3).forEach((t,i)=>{
+    html += `<div class='${i===0?"melhor":""}'>
+      <strong>${t.nome}</strong> — Prazo: ${t.prazo}h — Faixa CEP: ${t.faixa.cep_inicio} a ${t.faixa.cep_fim} — Frete: R$ ${t.valor.toFixed(2)}
+    </div>`;
   });
 
   document.getElementById("resultado").innerHTML = html;
 }
 
+inicializar();
 </script>
+
 </body>
 </html>
