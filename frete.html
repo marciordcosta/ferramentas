@@ -1,300 +1,39 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calculadora de Frete</title>
-
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background:#f7f7f7;
-  padding: 30px;
-  margin: 0;
-  display: flex;
-  justify-content: center;
-}
-
-.container {
-  background:white;
-  padding:25px;
-  border-radius:12px;
-  box-shadow:0 4px 10px rgba(0,0,0,0.1);
-  width: 100%;
-  max-width: 600px;
-}
-
-.row {
-  display: flex;
-  gap: 10px;
-}
-
-.small {
-  width: 85px;
-}
-
-input, select {
-  width:100%;
-  padding:10px;
-  margin-bottom:15px;
-  border:1px solid #ccc;
-  border-radius:6px;
-  font-size:16px;
-}
-
-button {
-  padding:10px 15px;
-  border:none;
-  border-radius:6px;
-  background:#2c7be5;
-  color:white;
-  cursor:pointer;
-}
-button:hover { background:#1a5fcc; }
-
-.resultado {
-  margin-top:20px;
-  padding:10px;
-  background:#f3f3f3;
-  border-radius:6px;
-}
-
-.melhor {
-  background:#d1f7c4;
-  padding:6px;
-  margin-bottom:6px;
-  border-radius:4px;
-}
-
-.autocomplete-items {
-  position:absolute;
-  border:1px solid #d4d4d4;
-  border-top:none;
-  z-index:99;
-  top:100%;
-  left:0;
-  right:0;
-  max-height:200px;
-  overflow-y:auto;
-  background:white;
-}
-.autocomplete-items div {
-  padding:10px;
-  cursor:pointer;
-  border-bottom:1px solid #d4d4d4;
-}
-.autocomplete-active {
-  background:#2c7be5 !important;
-  color:white;
-}
-</style>
-</head>
-<body>
-
-<div class="container">
-
-<h2>Calculadora de Frete</h2>
-
-<!-- CIDADE + UF -->
-<div class="row">
-  <div style="flex:1; position:relative;">
-    <label>Cidade</label>
-    <input type="text" id="cidade" placeholder="Digite a cidade">
-  </div>
-
-  <div class="small">
-    <label>UF</label>
-    <input type="text" id="uf" disabled style="text-align:center;">
-  </div>
-</div>
-
-<!-- PESQUISA POR CEP -->
-<div class="row">
-  <div style="flex:1;">
-    <label>CEP</label>
-    <input type="text" id="cep" placeholder="Digite o CEP">
-  </div>
-
-  <div class="small" style="display:flex; align-items:flex-end;">
-    <button onclick="buscarCEP()">Buscar</button>
-  </div>
-</div>
-
-<!-- PESO -->
-<label>Peso total (kg)</label>
-<input type="number" id="peso" step="0.01">
-
-<!-- VALOR DA MERCADORIA -->
-<label>Valor da mercadoria (R$)</label>
-<input type="number" id="valor" step="0.01">
-
-<!-- ORDEM -->
-<label>Ordenar por</label>
-<select id="ordenar">
-  <option value="prazo">Menor Prazo</option>
-  <option value="valor">Menor Frete</option>
-</select>
-
-<div style="display:flex; gap:10px; margin-top:10px;">
-  <button onclick="calcularFrete()">Calcular Frete</button>
-  <button style="background:#777;" onclick="limparTudo()">Limpar</button>
-</div>
-
-<div id="resultado" class="resultado"></div>
-
-</div>
-
-<script src="dados.js"></script>
-
-<script>
-// ✅ Deduplicar cidades
-const mapaCidades = new Map();
-
-DADOS_FRETE.transportadoras.forEach(t => {
-  Object.entries(t.prazos).forEach(([cidade, info]) => {
-    const chave = cidade + "-" + info.uf;
-    if (!mapaCidades.has(chave)) {
-      mapaCidades.set(chave, { nome: cidade, uf: info.uf });
-    }
-  });
-});
-
-const LISTA_CIDADES = Array.from(mapaCidades.values());
-
-// ✅ Autocomplete simples
 function setupAutocomplete(inp, arr) {
-  let currentFocus;
-
   inp.addEventListener("input", function() {
-    const val = this.value;
+    const val = this.value.trim();
     closeAllLists();
     if (!val) return;
+
+    const valNorm = normalizarNome(val);
 
     const list = document.createElement("DIV");
     list.setAttribute("class", "autocomplete-items");
     this.parentNode.appendChild(list);
 
     arr.forEach(item => {
-      if (item.nome.toUpperCase().startsWith(val.toUpperCase())) {
+      if (normalizarNome(item.nome).startsWith(valNorm)) {
         const el = document.createElement("DIV");
-        el.innerHTML = "<strong>" + item.nome.substr(0, val.length) + "</strong>" + item.nome.substr(val.length);
-        el.innerHTML += "<input type='hidden' value='" + item.nome + "'>";
+        el.innerHTML =
+          "<strong>" + item.nome.substr(0, val.length) + "</strong>" +
+          item.nome.substr(val.length);
+
+        el.innerHTML += `<input type='hidden' value='${item.nome}'>`;
+
         el.addEventListener("click", () => {
           inp.value = item.nome;
           document.getElementById("uf").value = item.uf;
           closeAllLists();
         });
+
         list.appendChild(el);
       }
     });
   });
 
-  document.addEventListener("click", e => closeAllLists(e.target));
-
   function closeAllLists(elmnt) {
     const items = document.getElementsByClassName("autocomplete-items");
     for (let i = 0; i < items.length; i++) {
-      if (elmnt !== items[i]) items[i].remove();
+      items[i].remove();
     }
   }
 }
-
-setupAutocomplete(document.getElementById("cidade"), LISTA_CIDADES);
-
-// ✅ Buscar CEP via Correios (API alternativa JSON)
-async function buscarCEP() {
-  const cep = document.getElementById("cep").value.replace(/\D/g, "");
-
-  if (cep.length !== 8) {
-    alert("CEP inválido");
-    return;
-  }
-
-  try {
-    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-    const data = await resp.json();
-
-    if (data.erro) {
-      alert("CEP não encontrado");
-      return;
-    }
-
-    const cidade = data.localidade;
-    const uf = data.uf;
-
-    document.getElementById("cidade").value = cidade;
-    document.getElementById("uf").value = uf;
-
-  } catch (e) {
-    alert("Erro ao consultar CEP");
-  }
-}
-
-// ✅ Calcular frete
-function calcularFrete() {
-  const cidade = document.getElementById("cidade").value.trim();
-  const uf = document.getElementById("uf").value.trim();
-  const peso = parseFloat(document.getElementById("peso").value);
-  const valorMercadoria = parseFloat(document.getElementById("valor").value);
-  const ordenarPor = document.getElementById("ordenar").value;
-
-  if (!cidade || !uf || isNaN(peso) || isNaN(valorMercadoria)) {
-    alert("Preencha todos os campos");
-    return;
-  }
-
-  const opcoes = DADOS_FRETE.transportadoras.filter(t => {
-    return t.prazos[cidade] && t.prazos[cidade].uf === uf;
-  });
-
-  if (opcoes.length === 0) {
-    document.getElementById("resultado").innerText = 
-      "Cidade não encontrada para entrega.";
-    return;
-  }
-
-  opcoes.forEach(t => {
-    const info = t.prazos[cidade];
-    let frete = (t.valorPorKg * peso) + 
-                (t.valorPorNF <= 1 ? t.valorPorNF * valorMercadoria : t.valorPorNF) +
-                (t.taxaColeta <= 1 ? t.taxaColeta * valorMercadoria : t.taxaColeta);
-
-    if (frete < t.freteMinimo) frete = t.freteMinimo;
-
-    t._freteCalc = frete;
-    t._prazoCalc = info.prazo;
-  });
-
-  if (ordenarPor === "prazo") {
-    opcoes.sort((a,b) => a._prazoCalc - b._prazoCalc);
-  } else {
-    opcoes.sort((a,b) => a._freteCalc - b._freteCalc);
-  }
-
-  let html = "<h3>Melhores transportadoras:</h3>";
-
-  opcoes.slice(0,3).forEach((t,i) => {
-    html += `
-      <div class="${i === 0 ? 'melhor' : ''}">
-        <strong>${t.nome}</strong> — 
-        Prazo: ${t._prazoCalc}h úteis — 
-        Frete: R$ ${t._freteCalc.toFixed(2)}
-      </div>`;
-  });
-
-  document.getElementById("resultado").innerHTML = html;
-}
-
-// ✅ Limpar tudo
-function limparTudo() {
-  document.getElementById("cidade").value = "";
-  document.getElementById("uf").value = "";
-  document.getElementById("cep").value = "";
-  document.getElementById("peso").value = "";
-  document.getElementById("valor").value = "";
-  document.getElementById("resultado").innerHTML = "";
-}
-
-</script>
-</body>
-</html>
