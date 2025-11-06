@@ -27,13 +27,17 @@ button:hover{background:#154a9a}
 <div class="box">
     <h3>Calcular Frete</h3>
 
-    <!-- BUSCA POR CIDADE PRIMEIRO -->
+    <!-- CIDADE -->
     <div style="position:relative;">
         <label>Cidade</label>
-        <input type="text" id="cidade" placeholder="Digite a cidade">
+        <input type="text" id="cidade" placeholder="Digite a cidade" onblur="autoDetectUF()">
     </div>
 
-    <!-- AGORA O CEP -->
+    <!-- UF BLOQUEADO -->
+    <label>UF</label>
+    <input type="text" id="uf" readonly style="background:#f0f0f0;">
+
+    <!-- CEP -->
     <label>CEP</label>
     <div class="busca-cep-linha">
         <input type="text" id="cep" placeholder="60010-000" maxlength="9" oninput="mascaraCEP(this)">
@@ -87,9 +91,38 @@ async function buscarCEP(){
         return;
     }
 
-    // Preenche cidade e salva UF
     document.getElementById("cidade").value = data.localidade;
+    document.getElementById("uf").value = data.uf;
+
     window.__UF_SELECIONADA = data.uf;
+}
+
+// =========================
+// AUTODETECT UF AO DIGITAR CIDADE
+// =========================
+function autoDetectUF(){
+    const cidade = document.getElementById("cidade").value.trim();
+    if(!cidade) return;
+
+    let ufDetectada = null;
+
+    window.DADOS_FRETE.transportadoras.forEach(t=>{
+        const entry = t.prazos[cidade];
+        if(!entry) return;
+
+        if(typeof entry === "object" && entry.uf){
+            ufDetectada = entry.uf;
+        }
+        if(typeof entry === "string" || typeof entry === "number"){
+            // fallback — assume CE como padrão
+            if(!ufDetectada) ufDetectada = "CE";
+        }
+    });
+
+    if(ufDetectada){
+        document.getElementById("uf").value = ufDetectada;
+        window.__UF_SELECIONADA = ufDetectada;
+    }
 }
 
 // =========================
@@ -135,6 +168,7 @@ function setupAutocomplete(inp, arr){
                 item.innerHTML += "<input type='hidden' value='"+c+"'>";
                 item.onclick = function(){
                     inp.value = this.getElementsByTagName("input")[0].value;
+                    autoDetectUF();
                     closeAllLists();
                 };
                 list.appendChild(item);
@@ -202,7 +236,7 @@ function calcularFrete(){
     const peso = parseFloat(document.getElementById("peso").value);
     const valor = parseFloat(document.getElementById("valor").value);
     const ordenar = document.getElementById("ordenar").value;
-    const ufSelecionada = window.__UF_SELECIONADA || null;
+    const ufSelecionada = window.__UF_SELECIONADA || document.getElementById("uf").value.trim();
 
     if(!cidade || isNaN(peso) || isNaN(valor)){
         alert("Preencha tudo");
