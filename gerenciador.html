@@ -185,17 +185,31 @@ async function render(){
 
 /* === LINHAS === */
 function rowFolder(f){
-  const r=document.createElement('div'); r.className='list-row';
-  r.innerHTML=`<div>📁</div>
-    <div><div class='name' style='cursor:pointer' onclick="gotoFolder('${f.full}')">${escapeHtml(f.name)}</div>
+  const r = document.createElement('div');
+  r.className = 'list-row';
+
+  r.innerHTML = `
+    <div>📁</div>
+    <div>
+      <div class="name" style="cursor:pointer"
+           onclick="gotoFolder('${f.full}')">
+        ${escapeHtml(f.name)}
+      </div>
+    </div>
     <div>-</div>
-    <div class='actions'>
-      <span class='icon' title='Renomear' onclick="renameFolder('${f.full}')">edit</span>
-      <span class='icon' title='Mover' onclick="openFolderPicker('move','${f.full}',true)">drive_file_move</span>
-      <span class='icon del' title='Excluir' onclick="removeFolder('${f.full}')">delete</span>
-    </div>`;
+    <div class="actions">
+      <span class="icon" title="Renomear"
+            onclick="event.stopPropagation(); renameFolder('${f.full}')">edit</span>
+      <span class="icon" title="Mover"
+            onclick="event.stopPropagation(); openFolderPicker('move','${f.full}',true)">drive_file_move</span>
+      <span class="icon del" title="Excluir"
+            onclick="event.stopPropagation(); removeFolder('${f.full}')">delete</span>
+    </div>
+  `;
+
   return r;
 }
+  
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row';
   r.onclick = ()=> setPreview(file);
@@ -420,6 +434,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
