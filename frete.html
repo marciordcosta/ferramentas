@@ -169,6 +169,7 @@ function setupAutocomplete(inp, arr) {
         div.innerHTML += "<input type='hidden' value='"+item+"'>";
         div.onclick = () => {
           inp.value = item;
+          document.getElementById("uf").value = obterUF(item);
           fecharListas();
         };
         box.appendChild(div);
@@ -296,6 +297,7 @@ function limparTudo() {
 
 </body>
 </html>
+
 
 
 
