@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gerenciador – Lista + Pré-visualização (Final)</title>
+<title>Gerenciador – Lista + Pré-visualização</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded" />
 <style>
   :root{
     --bg:#f5f7fb; --card:#fff; --text:#111827; --muted:#6b7280;
     --border:#e5e7eb; --primary:#2563eb; --primary-2:#1e40af;
     --danger:#dc2626; --shadow:0 10px 24px rgba(0,0,0,.06);
   }
-  *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
   header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-  .brand{font-weight:700}
+  .brand{font-weight:700;font-size:18px;display:flex;align-items:center;gap:12px}
+  .brand a{color:var(--primary);text-decoration:none;font-weight:600}
   .user a{color:var(--danger);cursor:pointer;text-decoration:none;margin-left:10px}
 
   .toolbar{display:flex;gap:10px;padding:14px;background:#fff;border-bottom:1px solid var(--border);align-items:center}
@@ -22,9 +23,11 @@
   .crumbs .sep{color:var(--muted)}
 
   input[type=text]{padding:10px 12px;border:1px solid var(--border);border-radius:10px;min-width:280px}
-  button{cursor:pointer;border:1px solid var(--border);border-radius:10px;background:#fff;padding:9px 12px}
+  button{cursor:pointer;border:1px solid var(--border);border-radius:10px;background:#fff;padding:9px 12px;display:flex;align-items:center;gap:4px}
   button.primary{background:var(--primary);border-color:var(--primary);color:#fff}
   button.primary:hover{background:var(--primary-2)}
+
+  .icon{font-family:"Material Symbols Rounded";font-size:20px;vertical-align:middle}
 
   /* Autocomplete */
   .ac-wrap{position:relative}
@@ -43,15 +46,14 @@
   .preview iframe.pdf{width:100%;height:640px;border:0}
   .preview img{max-width:100%;display:block}
 
-  /* Lista compacta */
   #view{display:block}
-  .list-head,.list-row{display:grid;grid-template-columns:40px 1fr 120px 200px;gap:10px;align-items:center}
+  .list-head,.list-row{display:grid;grid-template-columns:40px 1fr 120px 140px;gap:10px;align-items:center}
   .list-head{color:var(--muted);font-size:12px;margin-bottom:6px;padding:0 8px}
   .list-row{background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px}
   .list-row .name{font-weight:600}
-  .list-row .path{color:var(--muted);font-size:12px}
-  .actions button{padding:4px 8px;font-size:12px;margin-right:4px}
-  .actions .del{color:#b91c1c;border-color:#fca5a5}
+  .actions span{cursor:pointer;padding:6px;border-radius:6px;font-size:20px}
+  .actions span:hover{background:#f3f4f6}
+  .actions .del{color:#b91c1c}
 
   /* Modal pastas */
   .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:60}
@@ -64,7 +66,7 @@
 </head>
 <body>
 <header>
-  <div class="brand">Gerenciador</div>
+  <div class="brand">Gerenciador <a href="index.html">· Voltar</a></div>
   <div class="user"><span id="userEmail"></span><a onclick="logout()">sair</a></div>
 </header>
 
@@ -74,8 +76,8 @@
     <input id="q" type="text" placeholder="Pesquisar (auto-complete)" oninput="onTypeSearch()" onkeydown="if(event.key==='Enter')buscar()"/>
     <div id="acList"></div>
   </div>
-  <button onclick="buscar()">Buscar</button>
-  <button class="primary" onclick="pickFiles()">Enviar arquivo</button>
+  <button onclick="buscar()"><span class="icon">search</span></button>
+  <button class="primary" onclick="pickFiles()"><span class="icon">upload</span> Enviar</button>
   <input id="filePick" type="file" multiple style="display:none" />
 </div>
 
@@ -88,6 +90,10 @@
       <div class="title">Pré-visualização</div>
       <div class="meta" id="previewMeta">Selecione um arquivo</div>
       <div class="box" id="previewBox"><div style="padding:14px">Nenhum arquivo.</div></div>
+      <div id="sendArea" style="margin-top:12px;display:none">
+        <button onclick="sendWhatsApp()"><span class="icon">share</span> WhatsApp</button>
+        <button onclick="sendEmail()"><span class="icon">mail</span> Email</button>
+      </div>
     </div>
   </aside>
 </main>
@@ -99,7 +105,7 @@
       <strong id="dlgTitle"></strong>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="newFolderName" type="text" placeholder="Nova pasta (ex.: Boletins/2025)"/>
-        <button onclick="criarPastaFromDlg()">Adicionar</button>
+        <button onclick="criarPastaFromDlg()"><span class="icon">create_new_folder</span> Adicionar</button>
         <button onclick="hideDlg()">✕</button>
       </div>
     </header>
@@ -119,35 +125,26 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentPath = "";
 let uploadQueue = [];
-let dlgMode = "pick"; // 'pick' upload | 'move' mover
 let selectedFile = null;
-let acIndex = []; // índice para auto-complete
-let acTimer = null;
+let dlgMode = "pick"; // 'pick' upload | 'move' mover
+let acIndex = []; let acTimer = null;
 
 const el = s => document.querySelector(s);
-const clean = p => (p||"").replace(/^\/+|\/+$/g,"");
+const clean = p => (p||"").replace(/^\/+|\/+$/g, "");
 function fmtSize(n){if(!n)return"-";const u=["B","KB","MB","GB"];let i=0;while(n>1024&&i<u.length-1){n/=1024;i++}return n.toFixed(1)+" "+u[i]}
-function escapeHtml(s){return (s||"").replace(/[&<>\"']/g, function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m];})}
+function escapeHtml(s){return (s||"").replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 
 /* === AUTH === */
 async function ensureAuth(){
   const { data } = await supabase.auth.getSession();
-  if(!data.session){ location.href="index.html"; return; }
+  if(!data.session){ location.href = "index.html"; return; }
   const email = data.session.user?.email;
-  if(email !== OWNER_EMAIL){ await supabase.auth.signOut(); location.href="index.html"; return; }
+  if(email !== OWNER_EMAIL){ await supabase.auth.signOut(); location.href = "index.html"; return; }
   el('#userEmail').textContent = email;
 }
 function logout(){ supabase.auth.signOut().then(()=>location.href='index.html') }
 
-/* === BREADCRUMB === */
-function setCrumbs(){
-  const bc = el('#breadcrumbs'); bc.innerHTML='';
-  const root=document.createElement('span'); root.textContent='Arquivos'; root.onclick=()=>gotoFolder(''); bc.appendChild(root);
-  if(!currentPath) return;
-  let acc=''; currentPath.split('/').forEach(part=>{ acc = acc? acc+'/'+part : part; const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›'; const seg=document.createElement('span'); seg.textContent=part; seg.onclick=()=>gotoFolder(acc); bc.appendChild(sep); bc.appendChild(seg); });
-}
-
-/* === LISTAGEM === */
+/* === STORAGE HELPERS === */
 async function listChildren(prefix){
   const { data } = await supabase.storage.from(BUCKET).list(prefix||'', { limit:2000, sortBy:{column:'name',order:'asc'} });
   const folders=[], files=[];
@@ -160,6 +157,15 @@ async function listChildren(prefix){
   return { folders, files };
 }
 
+/* === BREADCRUMB === */
+function setCrumbs(){
+  const bc = el('#breadcrumbs'); bc.innerHTML='';
+  const root=document.createElement('span'); root.textContent='Arquivos'; root.onclick=()=>gotoFolder(''); bc.appendChild(root);
+  if(!currentPath) return;
+  let acc=''; currentPath.split('/').forEach(part=>{ acc = acc? acc+'/'+part : part; const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›'; const seg=document.createElement('span'); seg.textContent=part; seg.onclick=()=>gotoFolder(acc); bc.appendChild(sep); bc.appendChild(seg); });
+}
+
+/* === RENDER === */
 async function gotoFolder(prefix){ currentPath=clean(prefix||''); setCrumbs(); await render(); }
 
 async function render(){
@@ -168,18 +174,25 @@ async function render(){
   const head=document.createElement('div'); head.className='list-head'; head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>'; wrap.appendChild(head);
   folders.forEach(f=> wrap.appendChild(rowFolder(f)) );
   files.forEach(file=> wrap.appendChild(rowFile(file)) );
+
+  // Pré-visualização: escondida na raiz (só pastas)
+  const pane = document.querySelector('aside.right');
+  if(currentPath==='' && files.length===0){ pane.style.visibility='hidden'; pane.style.pointerEvents='none'; }
+  else { pane.style.visibility='visible'; pane.style.pointerEvents='auto'; }
+
   setPreview(null);
 }
 
+/* === LINHAS === */
 function rowFolder(f){
   const r=document.createElement('div'); r.className='list-row';
   r.innerHTML=`<div>📁</div>
     <div><div class='name' style='cursor:pointer' onclick="gotoFolder('${f.full}')">${escapeHtml(f.name)}</div><div class='path'>${escapeHtml(f.full)}</div></div>
     <div>-</div>
     <div class='actions'>
-      <button onclick="renameFolder('${f.full}')">Ren</button>
-      <button onclick="openFolderPicker('move','${f.full}',true)">Mover</button>
-      <button class='del' onclick="removeFolder('${f.full}')">Del</button>
+      <span class='icon' title='Renomear' onclick="renameFolder('${f.full}')">edit</span>
+      <span class='icon' title='Mover' onclick="openFolderPicker('move','${f.full}',true)">drive_file_move</span>
+      <span class='icon del' title='Excluir' onclick="removeFolder('${f.full}')">delete</span>
     </div>`;
   return r;
 }
@@ -190,31 +203,42 @@ function rowFile(file){
     <div><div class='name'>${escapeHtml(file.name)}</div><div class='path'>${escapeHtml(file.full)}</div></div>
     <div>${fmtSize(file.size)}</div>
     <div class='actions'>
-      <button onclick="event.stopPropagation(); downloadFile('${file.full}')">Baixar</button>
-      <button onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')">Mover</button>
-      <button onclick="event.stopPropagation(); renameFile('${file.full}')">Ren</button>
-      <button class='del' onclick="event.stopPropagation(); deleteFile('${file.full}')">Del</button>
+      <span class='icon' title='Baixar' onclick="event.stopPropagation(); downloadFile('${file.full}')">download</span>
+      <span class='icon' title='Mover' onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')">drive_file_move</span>
+      <span class='icon' title='Renomear' onclick="event.stopPropagation(); renameFile('${file.full}')">edit</span>
+      <span class='icon del' title='Excluir' onclick="event.stopPropagation(); deleteFile('${file.full}')">delete</span>
     </div>`;
   return r;
 }
 
-/* === Preview === */
+/* === PREVIEW === */
+async function getSignedUrl(path){
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+  if(error) return null; return data.signedUrl;
+}
+
 function setPreview(file){
   selectedFile = file;
   const meta = el('#previewMeta'); const box = el('#previewBox');
-  if(!file){ meta.textContent='Selecione um arquivo'; box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>'; return; }
+  const send = el('#sendArea');
+
+  if(!file){ meta.textContent='Selecione um arquivo'; box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>'; send.style.display='none'; return; }
+
   meta.textContent = `${file.full} • ${fmtSize(file.size)}`;
+  send.style.display='flex';
+
   const lower = file.name.toLowerCase();
   if(/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) return previewImage(file.full);
   if(/\.(pdf)$/i.test(lower)) return previewPDF(file.full);
+
   box.innerHTML = `<div style='padding:14px'>
     <div style='font-size:40px;margin-bottom:8px'>📄</div>
     <div style='font-weight:600;margin-bottom:4px'>${escapeHtml(file.name)}</div>
     <div class='path'>${escapeHtml(file.full)}</div>
     <div class='path'>Tamanho: ${fmtSize(file.size)}</div>
-    <div style='margin-top:10px'><button onclick="downloadFile('${file.full}')">Baixar</button></div>
   </div>`;
 }
+
 async function previewImage(path){
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
   const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
@@ -226,7 +250,13 @@ async function previewPDF(path){
   const url = URL.createObjectURL(data); box.innerHTML = `<iframe class='pdf' src='${url}'></iframe>`;
 }
 
-/* === Arquivo: ações === */
+/* === ENVIAR === */
+async function sendWhatsApp(){ if(!selectedFile) return; const url = await getSignedUrl(selectedFile.full); if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; } const text = `Segue o arquivo: ${selectedFile.full}
+${url}`; window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank'); }
+async function sendEmail(){ if(!selectedFile) return; const url = await getSignedUrl(selectedFile.full); if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; } const subject = 'Envio de arquivo'; const body = `Segue o arquivo: ${selectedFile.full}
+${url}`; window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }
+
+/* === AÇÕES ARQUIVO === */
 async function downloadFile(full){
   const { data, error } = await supabase.storage.from(BUCKET).download(full);
   if(error){ alert('Falha ao baixar.'); return; }
@@ -235,12 +265,13 @@ async function downloadFile(full){
 async function deleteFile(full){ if(!confirm('Excluir arquivo?')) return; const { error } = await supabase.storage.from(BUCKET).remove([full]); if(error){ alert('Falha ao excluir.'); return; } await render(); await rebuildIndex(); }
 async function renameFile(full){ const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/'); const novo=prompt('Novo nome do arquivo:', old); if(!novo||novo===old) return; const { error } = await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`); if(error){ alert('Falha ao renomear.'); return; } await render(); await rebuildIndex(); }
 
-/* === Pasta: ações === */
+/* === AÇÕES PASTA === */
 async function renameFolder(full){ const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/'); const novo=prompt('Novo nome da pasta:', old); if(!novo||novo===old) return; const items=await listAllUnder(full); await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), {upsert:true}); for(const p of items){ const rest=p.slice(full.length+1); await supabase.storage.from(BUCKET).move(p, `${parent?parent+'/':''}${novo}/${rest}`); } await supabase.storage.from(BUCKET).remove([`${full}/.init`]).catch(()=>{}); await render(); await rebuildIndex(); }
-async function removeFolder(full){ if(!confirm(`Excluir a pasta e todo o conteúdo?\n${full}`)) return; const items=await listAllUnder(full); if(items.length===0) items.push(`${full}/.init`); const { error } = await supabase.storage.from(BUCKET).remove(items); if(error){ alert('Falha ao excluir pasta.'); return; } await render(); await rebuildIndex(); }
+async function removeFolder(full){ if(!confirm(`Excluir a pasta e todo o conteúdo?
+${full}`)) return; const items=await listAllUnder(full); if(items.length===0) items.push(`${full}/.init`); const { error } = await supabase.storage.from(BUCKET).remove(items); if(error){ alert('Falha ao excluir pasta.'); return; } await render(); await rebuildIndex(); }
 async function listAllUnder(prefix){ const out=[], q=[prefix]; while(q.length){ const p=q.shift(); const { data }=await supabase.storage.from(BUCKET).list(p,{limit:2000}); for(const it of (data||[])){ if(it.name==='.init') continue; const full=clean(`${p}/${it.name}`); if(it.metadata && typeof it.metadata.size==='number') out.push(full); else q.push(full); } } return out; }
 
-/* === Upload / Mover (modal) === */
+/* === UPLOAD / MOVER (MODAL) === */
 function pickFiles(){ el('#filePick').click(); }
 el('#filePick').addEventListener('change', e=>{ uploadQueue = Array.from(e.target.files||[]); openFolderPicker('pick'); });
 
@@ -257,7 +288,7 @@ async function loadDlgFolders(){
   const folders=await listAllFolders();
   folders.forEach(f=>{
     const d=document.createElement('div'); d.className='folder-mini';
-    d.innerHTML=`<div>📁</div><div style='flex:1;min-width:0'>${escapeHtml(f)}</div><div style='display:flex;gap:6px'><button onclick="renameFolder('${f}')">Ren</button><button class='del' onclick="removeFolder('${f}')">Del</button></div>`;
+    d.innerHTML=`<div>📁</div><div style='flex:1;min-width:0'>${escapeHtml(f)}</div><div style='display:flex;gap:6px'><span class='icon' onclick="renameFolder('${f}')">edit</span><span class='icon del' onclick="removeFolder('${f}')">delete</span></div>`;
     d.ondblclick=()=> selectFolderForAction(f);
     grid.appendChild(d);
   });
@@ -323,7 +354,7 @@ async function criarPastaFromDlg(){
   await loadDlgFolders(); await render(); await rebuildIndex();
 }
 
-/* === Busca global + Auto-complete === */
+/* === BUSCA + AUTOCOMPLETE === */
 async function rebuildIndex(){
   const out=[]; async function scan(prefix){
     const { data }=await supabase.storage.from(BUCKET).list(prefix||'',{limit:2000});
@@ -375,12 +406,13 @@ async function buscar(){
   setPreview(null);
 }
 
-/* === Boot === */
+/* === BOOT === */
 (async function(){
   await ensureAuth();
   await gotoFolder('');
   await rebuildIndex();
 })();
 </script>
+
 </body>
 </html>
