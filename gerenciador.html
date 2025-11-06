@@ -38,7 +38,7 @@
 
   main{display:flex;gap:16px;padding:16px}
   .left{flex:1}
-  .right{width:520px;margin-top:-12px}
+  .right{width:520px;margin-top:-90px}
 
   .preview{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
   .preview .title{font-weight:700;margin-bottom:10px;font-size:17px}
@@ -72,7 +72,7 @@
 
 <div class="toolbar">
   <div id="breadcrumbs" class="crumbs"></div>
-  <div class="ac-wrap" style="flex:1;max-width:520px">
+  <div class="ac-wrap" style="flex:1;max-width:450px">
     <input id="q" type="text" placeholder="Pesquisar (auto-complete)" oninput="onTypeSearch()" onkeydown="if(event.key==='Enter')buscar()"/>
     <div id="acList"></div>
   </div>
@@ -420,4 +420,5 @@ async function buscar(){
 
 </body>
 </html>
+
 
