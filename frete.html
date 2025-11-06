@@ -134,6 +134,19 @@ button:hover { background:#1a5fcc; }
 <script src="dados.js"></script>
 
 <script>
+
+// ============================
+// FUNÇÃO PARA OBTER UF DA CIDADE
+// ============================
+function obterUF(cidade) {
+  for (const t of DADOS_FRETE.transportadoras) {
+    if (t.prazos[cidade] !== undefined) {
+      return t.uf || ""; // precisa existir "uf" no dados.js
+    }
+  }
+  return "";
+}
+
 // Remover duplicações de cidades
 function extrairCidades() {
   const set = new Set();
@@ -190,6 +203,13 @@ function setupAutocomplete(inp, arr) {
 }
 
 setupAutocomplete(document.getElementById("cidade"), LISTA_CIDADES);
+
+
+// ✅ Preencher UF ao sair do campo cidade
+document.getElementById("cidade").addEventListener("blur", function () {
+  const c = this.value.trim();
+  document.getElementById("uf").value = obterUF(c);
+});
 
 
 // ============================
@@ -297,8 +317,3 @@ function limparTudo() {
 
 </body>
 </html>
-
-
-
-
-
