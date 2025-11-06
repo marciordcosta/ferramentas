@@ -7,7 +7,7 @@
       "taxaColeta": 0,
       "freteMinimo": 60.00,
       "prazos": {
-        "Abaiara": 24 | 60000000 a 61000000,
+        "Abaiara": 24,
         "Acarape": 24,
         "Acarau": 72,
         "Acopiara": 24,
@@ -551,6 +551,7 @@
     }
   ]
 };
+
 
 
 
