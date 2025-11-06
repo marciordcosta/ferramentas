@@ -8,7 +8,10 @@
 <style>
 body{font-family:Arial;background:#f5f5f5;margin:0;padding:20px;display:flex;justify-content:center}
 .box{background:#fff;padding:25px;border-radius:10px;width:100%;max-width:500px;box-shadow:0 2px 6px rgba(0,0,0,0.15)}
-input,select,button{width:100%;padding:10px;margin:8px 0;border:1px solid #ccc;border-radius:5px;font-size:15px}
+input,select,button{padding:10px;margin:8px 0;border:1px solid #ccc;border-radius:5px;font-size:15px}
+input,select{width:100%}
+.busca-cep-linha{display:flex;gap:8px;align-items:center}
+.busca-cep-linha input{flex:1}
 button{background:#1e65d4;color:#fff;border:none;cursor:pointer}
 button:hover{background:#154a9a}
 .resultado{margin-top:20px;padding:15px;background:#eee;border-radius:6px}
@@ -24,13 +27,17 @@ button:hover{background:#154a9a}
 <div class="box">
     <h3>Calcular Frete</h3>
 
-    <label>CEP</label>
-    <input type="text" id="cep" placeholder="Ex: 60010-000" maxlength="9" oninput="mascaraCEP(this)">
-    <button onclick="buscarCEP()">Buscar CEP</button>
-
+    <!-- BUSCA POR CIDADE PRIMEIRO -->
     <div style="position:relative;">
         <label>Cidade</label>
         <input type="text" id="cidade" placeholder="Digite a cidade">
+    </div>
+
+    <!-- AGORA O CEP -->
+    <label>CEP</label>
+    <div class="busca-cep-linha">
+        <input type="text" id="cep" placeholder="60010-000" maxlength="9" oninput="mascaraCEP(this)">
+        <button onclick="buscarCEP()">Buscar</button>
     </div>
 
     <label>Peso (kg)</label>
@@ -80,12 +87,13 @@ async function buscarCEP(){
         return;
     }
 
+    // Preenche cidade e salva UF
     document.getElementById("cidade").value = data.localidade;
     window.__UF_SELECIONADA = data.uf;
 }
 
 // =========================
-// NORMALIZADOR DO PRAZO
+// NORMALIZAÇÃO DO PRAZO
 // =========================
 function getPrazoMeta(entry){
     if(entry == null) return null;
@@ -120,7 +128,7 @@ function setupAutocomplete(inp, arr){
         list.setAttribute("class", "autocomplete-items");
         this.parentNode.appendChild(list);
 
-        arr.forEach(c => {
+        arr.forEach(c=>{
             if(c.substr(0,val.length).toLowerCase() === val.toLowerCase()){
                 const item = document.createElement("DIV");
                 item.innerHTML = "<strong>"+c.substr(0,val.length)+"</strong>"+c.substr(val.length);
@@ -157,11 +165,9 @@ function setupAutocomplete(inp, arr){
         if(currentFocus < 0) currentFocus = x.length - 1;
         x[currentFocus].classList.add("autocomplete-active");
     }
-
     function removeActive(x){
         for(let i=0;i<x.length;i++) x[i].classList.remove("autocomplete-active");
     }
-
     function closeAllLists(elmnt){
         const items = document.getElementsByClassName("autocomplete-items");
         for(let i=0;i<items.length;i++){
@@ -170,26 +176,22 @@ function setupAutocomplete(inp, arr){
             }
         }
     }
-
     document.addEventListener("click", function(e){
         closeAllLists(e.target);
     });
 }
 
 // =========================
-// INICIALIZAR AUTOCOMPLETE
+// INICIALIZA AUTOCOMPLETE
 // =========================
 function inicializar(){
     const todas = new Set();
-
-    (window.DADOS_FRETE.transportadoras || []).forEach(t=>{
-        Object.keys(t.prazos || {}).forEach(c=>todas.add(c));
+    window.DADOS_FRETE.transportadoras.forEach(t=>{
+        Object.keys(t.prazos).forEach(c=>todas.add(c));
     });
-
     const lista = Array.from(todas).sort();
     setupAutocomplete(document.getElementById("cidade"), lista);
 }
-
 inicializar();
 
 // =========================
@@ -200,7 +202,6 @@ function calcularFrete(){
     const peso = parseFloat(document.getElementById("peso").value);
     const valor = parseFloat(document.getElementById("valor").value);
     const ordenar = document.getElementById("ordenar").value;
-
     const ufSelecionada = window.__UF_SELECIONADA || null;
 
     if(!cidade || isNaN(peso) || isNaN(valor)){
@@ -217,18 +218,18 @@ function calcularFrete(){
 
         if(meta.uf && ufSelecionada && meta.uf !== ufSelecionada) return;
 
-        const valorNF = (t.valorPorNF <= 1) ? t.valorPorNF * valor : t.valorPorNF;
-        const taxaColeta = (t.taxaColeta <= 1) ? t.taxaColeta * valor : t.taxaColeta;
+        const valorNF = t.valorPorNF <= 1 ? t.valorPorNF * valor : t.valorPorNF;
+        const taxaColeta = t.taxaColeta <= 1 ? t.taxaColeta * valor : t.taxaColeta;
 
         let frete = (t.valorPorKg * peso) + valorNF + taxaColeta;
         if(t.freteMinimo && frete < t.freteMinimo) frete = t.freteMinimo;
 
         opcoes.push({
-            nome: t.nome,
-            prazoCidade: meta.prazo,
-            cep_inicio: meta.cep_inicio,
-            cep_fim: meta.cep_fim,
-            freteTotal: frete
+            nome:t.nome,
+            prazoCidade:meta.prazo,
+            cep_inicio:meta.cep_inicio,
+            cep_fim:meta.cep_fim,
+            freteTotal:frete
         });
     });
 
@@ -249,12 +250,12 @@ function calcularFrete(){
 
     opcoes.slice(0,3).forEach((t,i)=>{
         const faixa = (t.cep_inicio && t.cep_fim)
-            ? ` — CEP: ${t.cep_inicio} a ${t.cep_fim}` : "";
+            ? ` — CEP ${t.cep_inicio} a ${t.cep_fim}` : "";
 
         html += `
         <div class="${i===0?'melhor':''}">
             <strong>${t.nome}</strong> —
-            Prazo: ${t.prazoCidade}${faixa} —
+            Prazo: ${t.prazoCidade}h úteis${faixa} —
             R$ ${t.freteTotal.toFixed(2)}
         </div>`;
     });
