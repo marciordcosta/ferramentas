@@ -198,17 +198,20 @@ function rowFolder(f){
 }
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row';
+  const folderPath = file.full.split('/').slice(0,-1).join('/');
   r.onclick = ()=> setPreview(file);
   r.innerHTML=`<div>📄</div>
-    <div><div class='name'>${escapeHtml(file.name)}</div><div class='path'>${escapeHtml(file.full)}</div></div>
+    <div><div class='name' style="font-size:13px; font-weight:600">${escapeHtml(file.name)}</div>
+    <div class='path' style="font-size:11px;color:var(--muted)">${escapeHtml(folderPath)}</div></div>
     <div>${fmtSize(file.size)}</div>
     <div class='actions'>
-      <span class='icon' title='Baixar' onclick="event.stopPropagation(); downloadFile('${file.full}')">download</span>
-      <span class='icon' title='Mover' onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')">drive_file_move</span>
-      <span class='icon' title='Renomear' onclick="event.stopPropagation(); renameFile('${file.full}')">edit</span>
-      <span class='icon del' title='Excluir' onclick="event.stopPropagation(); deleteFile('${file.full}')">delete</span>
+      <button onclick="event.stopPropagation(); downloadFile('${file.full}')">⬇️</button>
+      <button onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')">📁</button>
+      <button onclick="event.stopPropagation(); renameFile('${file.full}')">✏️</button>
+      <button class='del' onclick="event.stopPropagation(); deleteFile('${file.full}')">🗑️</button>
     </div>`;
   return r;
+}
 }
 
 /* === PREVIEW === */
@@ -416,5 +419,3 @@ async function buscar(){
 
 </body>
 </html>
-
-
