@@ -187,7 +187,7 @@ async function render(){
 function rowFolder(f){
   const r=document.createElement('div'); r.className='list-row';
   r.innerHTML=`<div>📁</div>
-    <div><div class='name' style='cursor:pointer' onclick="gotoFolder('${f.full}')">${escapeHtml(f.name)}</div><div class='path'>${escapeHtml(f.full)}</div></div>
+    <div><div class='name' style='cursor:pointer' onclick="gotoFolder('${f.full}')">${escapeHtml(f.name)}</div>
     <div>-</div>
     <div class='actions'>
       <span class='icon' title='Renomear' onclick="renameFolder('${f.full}')">edit</span>
@@ -420,6 +420,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
