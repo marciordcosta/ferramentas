@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculadora de Frete</title>
+
 <style>
 body {font-family: Arial, sans-serif; background:#f7f7f7; display:flex; justify-content:center; align-items:flex-start; padding-top:40px; margin:0;}
 .container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); max-width:600px; width:95%;}
@@ -12,6 +13,7 @@ button {padding:10px 15px; font-size:14px; margin-top:10px; border:none; border-
 button:hover {background:#1a5fcc;}
 .resultado {margin-top:20px; padding:10px; background:#f3f3f3; border-radius:6px;}
 .melhor {background-color:#d1f7c4; padding:5px; border-radius:4px; margin-bottom:5px;}
+
 .autocomplete-items {
   position: absolute;
   border: 1px solid #d4d4d4;
@@ -30,12 +32,7 @@ button:hover {background:#1a5fcc;}
   border-bottom: 1px solid #d4d4d4;
 }
 .autocomplete-active {background-color:#2c7be5 !important; color:#fff;}
-</style>
-</head> 
-<body>
-  
-<a href="index.html" class="voltar-inicio">Voltar</a>
-<style>
+
 .voltar-inicio {
     position: fixed;
     top: 10px;
@@ -51,7 +48,12 @@ button:hover {background:#1a5fcc;}
     color: #1a5fcc;
 }
 </style>
-  
+</head> 
+
+<body>
+
+<a href="index.html" class="voltar-inicio">Voltar</a>
+
 <div class="container">
   <h2>Cotação de Frete</h2>
 
@@ -78,12 +80,12 @@ button:hover {background:#1a5fcc;}
 </div>
 
 <script>
-
-<script>
+// =========================
+//  CARREGAR JSON EXTERNO
+// =========================
 
 let dados = null;
 
-// === Carregar JSON ===
 async function carregarJSON() {
   try {
     const resp = await fetch("dados.json");
@@ -94,9 +96,10 @@ async function carregarJSON() {
   }
 }
 
-// === Inicialização ===
+// =========================
+//   INICIALIZAÇÃO
+// =========================
 function inicializar() {
-
   const todasCidades = new Set();
 
   dados.transportadoras.forEach(t => {
@@ -105,10 +108,12 @@ function inicializar() {
 
   const cidades = Array.from(todasCidades).sort();
 
-  setupAutocomplete(document.getElementById('cidade'), cidades);
+  setupAutocomplete(document.getElementById("cidade"), cidades);
 }
 
-// === Autocomplete ===
+// =========================
+//   AUTOCOMPLETE
+// =========================
 function setupAutocomplete(inp, arr) {
   let currentFocus;
 
@@ -132,8 +137,7 @@ function setupAutocomplete(inp, arr) {
       if (item.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
 
         const itemDiv = document.createElement("div");
-        itemDiv.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>";
-        itemDiv.innerHTML += item.substr(val.length);
+        itemDiv.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>" + item.substr(val.length);
         itemDiv.innerHTML += "<input type='hidden' value='" + item + "'>";
 
         itemDiv.addEventListener("click", function () {
@@ -152,10 +156,10 @@ function setupAutocomplete(inp, arr) {
     let x = document.getElementById(this.id + "-autocomplete-list");
     if (x) x = x.getElementsByTagName("div");
 
-    if (e.keyCode == 40) { // seta pra baixo
+    if (e.keyCode == 40) { // seta baixo
       currentFocus++;
       addActive(x);
-    } else if (e.keyCode == 38) { // seta pra cima
+    } else if (e.keyCode == 38) { // seta cima
       currentFocus--;
       addActive(x);
     } else if (e.keyCode == 13) { // enter
@@ -196,7 +200,9 @@ function setupAutocomplete(inp, arr) {
   });
 }
 
-// === Formatador de Prazo ===
+// =========================
+//   FORMATAR PRAZO
+// =========================
 function formatPrazo(horas) {
   if (typeof horas === "string") return horas;
 
@@ -210,7 +216,9 @@ function formatPrazo(horas) {
   return str.trim();
 }
 
-// === Cálculo de Frete ===
+// =========================
+//   CALCULAR FRETE
+// =========================
 function calcularFrete() {
 
   const cidade = document.getElementById("cidade").value.trim();
@@ -266,19 +274,11 @@ function calcularFrete() {
   document.getElementById("resultado").innerHTML = html;
 }
 
-// Iniciar
+// =========================
+//   INICIAR
+// =========================
 carregarJSON();
 
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
