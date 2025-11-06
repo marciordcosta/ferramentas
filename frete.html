@@ -58,14 +58,10 @@ button {
   padding:10px 15px;
   border-radius:6px;
   cursor:pointer;
-  margin-top:10px;
+  margin-top:6px;
 }
 
 button:hover { background:#1a5fcc; }
-
-.btn-calcular {
-  margin-left:10px !important;
-}
 
 .resultado {
   background:#f7f7f7;
@@ -131,7 +127,7 @@ button:hover { background:#1a5fcc; }
     <option value="valor">Menor frete</option>
   </select>
 
-  <button onclick="calcularFrete()">Calcular Frete</button>
+  <button onclick="calcularFrete()" style="background:#888; margin-top:10px; margin-left:10px;">Calcular Frete</button>
   <button onclick="limparTudo()" style="background:#888; margin-left:10px;">Limpar</button>
 
   <div id="resultado" class="resultado"></div>
@@ -325,6 +321,7 @@ function limparTudo() {
 
 </body>
 </html>
+
 
 
 
