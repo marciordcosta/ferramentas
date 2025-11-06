@@ -194,6 +194,7 @@
 
     {
       "nome": "Ceará Transportes",
+      "uf": "CE",
       "valorPorKg": 0.50,
       "valorPorNF": 0.0015,
       "taxaColeta": 0,
@@ -552,6 +553,7 @@
     }
   ]
 };
+
 
 
 
