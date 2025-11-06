@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculadora de Frete</title>
 
+<!-- IMPORTA O JSON EM FORMATO JS -->
+<script src="dados.js"></script>
+
 <style>
 body {font-family: Arial, sans-serif; background:#f7f7f7; display:flex; justify-content:center; align-items:flex-start; padding-top:40px; margin:0;}
 .container {background:white; padding:30px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1); max-width:600px; width:95%;}
@@ -80,49 +83,36 @@ button:hover {background:#1a5fcc;}
 </div>
 
 <script>
-// =========================
-//  CARREGAR JSON EXTERNO
-// =========================
-
+// ====================================
+//   PEGA O JSON DO ARQUIVO dados.js
+// ====================================
 let dados = window.DADOS_FRETE;
+
+// ====================================
+//   INICIALIZAÇÃO
+// ====================================
 inicializar();
 
-async function carregarJSON() {
-  try {
-    const resp = await fetch("dados.js");
-    dados = await resp.json();
-    inicializar();
-  } catch (e) {
-    alert("Erro ao carregar dados.json");
-  }
-}
-
-// =========================
-//   INICIALIZAÇÃO
-// =========================
 function inicializar() {
-  const todasCidades = new Set();
+  const todas = new Set();
 
-  dados.transportadoras.forEach(t => {
-    Object.keys(t.prazos).forEach(c => todasCidades.add(c));
-  });
+  dados.transportadoras.forEach(t =>
+    Object.keys(t.prazos).forEach(c => todas.add(c))
+  );
 
-  const cidades = Array.from(todasCidades).sort();
-
+  const cidades = Array.from(todas).sort();
   setupAutocomplete(document.getElementById("cidade"), cidades);
 }
 
-// =========================
+// ====================================
 //   AUTOCOMPLETE
-// =========================
+// ====================================
 function setupAutocomplete(inp, arr) {
   let currentFocus;
 
   inp.addEventListener("input", function () {
-
     const val = this.value.trim();
     closeAllLists();
-
     if (!val) return;
 
     currentFocus = -1;
@@ -130,51 +120,43 @@ function setupAutocomplete(inp, arr) {
     const list = document.createElement("div");
     list.setAttribute("id", this.id + "-autocomplete-list");
     list.setAttribute("class", "autocomplete-items");
-
     this.parentNode.appendChild(list);
 
     arr.forEach(item => {
-
       if (item.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
+        const div = document.createElement("div");
+        div.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>" + item.substr(val.length);
+        div.innerHTML += "<input type='hidden' value='" + item + "'>";
 
-        const itemDiv = document.createElement("div");
-        itemDiv.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>" + item.substr(val.length);
-        itemDiv.innerHTML += "<input type='hidden' value='" + item + "'>";
-
-        itemDiv.addEventListener("click", function () {
+        div.addEventListener("click", function () {
           inp.value = this.getElementsByTagName("input")[0].value;
           closeAllLists();
         });
 
-        list.appendChild(itemDiv);
+        list.appendChild(div);
       }
-
     });
   });
 
   inp.addEventListener("keydown", function (e) {
-
     let x = document.getElementById(this.id + "-autocomplete-list");
     if (x) x = x.getElementsByTagName("div");
 
-    if (e.keyCode == 40) { // seta baixo
+    if (e.keyCode == 40) {
       currentFocus++;
       addActive(x);
-    } else if (e.keyCode == 38) { // seta cima
+    } else if (e.keyCode == 38) {
       currentFocus--;
       addActive(x);
-    } else if (e.keyCode == 13) { // enter
+    } else if (e.keyCode == 13) {
       e.preventDefault();
-      if (currentFocus > -1) {
-        if (x) x[currentFocus].click();
-      }
+      if (currentFocus > -1 && x) x[currentFocus].click();
     }
   });
 
   function addActive(x) {
     if (!x) return;
     removeActive(x);
-
     if (currentFocus >= x.length) currentFocus = 0;
     if (currentFocus < 0) currentFocus = x.length - 1;
 
@@ -182,16 +164,14 @@ function setupAutocomplete(inp, arr) {
   }
 
   function removeActive(x) {
-    for (let i = 0; i < x.length; i++) {
-      x[i].classList.remove("autocomplete-active");
-    }
+    for (let i = 0; i < x.length; i++) x[i].classList.remove("autocomplete-active");
   }
 
   function closeAllLists(elmnt) {
     const items = document.getElementsByClassName("autocomplete-items");
-    for (let i = 0; i < items.length; i++) {
-      if (elmnt != items[i] && elmnt != inp) {
-        items[i].parentNode.removeChild(items[i]);
+    for (let item of items) {
+      if (elmnt !== item && elmnt !== inp) {
+        item.parentNode.removeChild(item);
       }
     }
   }
@@ -201,33 +181,32 @@ function setupAutocomplete(inp, arr) {
   });
 }
 
-// =========================
+// ====================================
 //   FORMATAR PRAZO
-// =========================
+// ====================================
 function formatPrazo(horas) {
   if (typeof horas === "string") return horas;
 
   const dias = Math.floor(horas / 24);
-  const restante = horas % 24;
+  const h = horas % 24;
 
   let str = "";
   if (dias > 0) str += `${dias} dia${dias > 1 ? "s" : ""} `;
-  if (restante > 0) str += `${restante} hora${restante > 1 ? "s" : ""}`;
+  if (h > 0) str += `${h} hora${h > 1 ? "s" : ""}`;
 
   return str.trim();
 }
 
-// =========================
+// ====================================
 //   CALCULAR FRETE
-// =========================
+// ====================================
 function calcularFrete() {
-
   const cidade = document.getElementById("cidade").value.trim();
   const peso = parseFloat(document.getElementById("peso").value);
-  const valorMercadoria = parseFloat(document.getElementById("valor").value);
-  const ordenarPor = document.getElementById("ordenar").value;
+  const valor = parseFloat(document.getElementById("valor").value);
+  const ordenar = document.getElementById("ordenar").value;
 
-  if (!cidade || isNaN(peso) || isNaN(valorMercadoria)) {
+  if (!cidade || isNaN(peso) || isNaN(valor)) {
     alert("Preencha corretamente todos os campos");
     return;
   }
@@ -240,47 +219,33 @@ function calcularFrete() {
   }
 
   opcoes.forEach(t => {
+    const valorNF = t.valorPorNF <= 1 ? (t.valorPorNF * valor) : t.valorPorNF;
+    const coleta = t.taxaColeta <= 1 ? (t.taxaColeta * valor) : t.taxaColeta;
+    let total = (t.valorPorKg * peso) + valorNF + coleta;
 
-    const valorNF = t.valorPorNF <= 1 ? (t.valorPorNF * valorMercadoria) : t.valorPorNF;
-    const taxaColeta = t.taxaColeta <= 1 ? (t.taxaColeta * valorMercadoria) : t.taxaColeta;
+    if (t.freteMinimo && total < t.freteMinimo) total = t.freteMinimo;
 
-    let freteTotal = (t.valorPorKg * peso) + valorNF + taxaColeta;
-
-    if (t.freteMinimo && freteTotal < t.freteMinimo) {
-      freteTotal = t.freteMinimo;
-    }
-
-    t.freteTotal = freteTotal;
+    t.freteTotal = total;
     t.prazoCidade = t.prazos[cidade];
-
   });
 
-  if (ordenarPor === "prazo") {
-    opcoes.sort((a, b) => a.prazoCidade - b.prazoCidade);
-  } else {
-    opcoes.sort((a, b) => a.freteTotal - b.freteTotal);
-  }
+  if (ordenar === "prazo") opcoes.sort((a, b) => a.prazoCidade - b.prazoCidade);
+  else opcoes.sort((a, b) => a.freteTotal - b.freteTotal);
 
   let html = "<h3>Melhores transportadoras:</h3>";
 
   opcoes.slice(0, 3).forEach((t, i) => {
     html += `
-      <div class="${i === 0 ? 'melhor' : ''}">
-        <strong>${t.nome}</strong> — 
+      <div class="${i === 0 ? "melhor" : ""}">
+        <strong>${t.nome}</strong> —
         Prazo: ${formatPrazo(t.prazoCidade)} —
         Frete: R$ ${t.freteTotal.toFixed(2)}
-      </div>`;
+      </div>
+    `;
   });
 
   document.getElementById("resultado").innerHTML = html;
 }
-
-// =========================
-//   INICIAR
-// =========================
-carregarJSON();
-
 </script>
 </body>
 </html>
-
