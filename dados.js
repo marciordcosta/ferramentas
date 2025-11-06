@@ -1,4 +1,4 @@
-{
+window.DADOS_FRETE = {
   "transportadoras": [
     {
       "nome": "Cbirdex",
@@ -330,4 +330,5 @@
       }
     }
   ]
-}
+};
+
