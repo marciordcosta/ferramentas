@@ -257,7 +257,11 @@ async function render(){
     pane.style.visibility='visible'; pane.style.pointerEvents='auto';
   }
 
-  setPreview(null);
+  if (hits.length === 1) {
+    const h = hits[0];
+    const file = { name: h.full.split('/').pop(), full: h.full, size: 0 };
+    setPreview(file);
+ }
 }
 
 /* === LINHAS === */
@@ -756,6 +760,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
