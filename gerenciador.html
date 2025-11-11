@@ -726,25 +726,44 @@ async function buscar(){
   if(!acIndex.length) await rebuildIndex();
 
   const hits = acIndex.filter(x=>x.full.toLowerCase().includes(term));
-  const wrap=el('#view'); wrap.innerHTML='';
+  const wrap=el('#view'); 
+  wrap.innerHTML='';
 
-  const head=document.createElement('div'); head.className='list-head';
+  const head=document.createElement('div'); 
+  head.className='list-head';
   head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
   wrap.appendChild(head);
-  
-  // pré-visualizar automaticamente o primeiro resultado, se houver
-  if (hits.length > 0) {
-  const first = hits[0];
-  const parts = first.full.split('/');
-  const folder = parts.slice(0,-1).join('/');
-  const name = parts.pop();
 
-  const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
-  const item = (data||[]).find(x=>x.name === name);
-  if (item) {
-    setPreview({ name, full:first.full, size:item.metadata.size });
+  if (hits.length > 0) {
+    const first = hits[0];
+    const parts = first.full.split('/');
+    const folder = parts.slice(0, -1).join('/');
+    const name = parts.pop();
+
+    const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
+    const item = (data || []).find(x => x.name === name);
+
+    if (item) {
+      setPreview({
+        name,
+        full: first.full,
+        size: item.metadata?.size || 0
+      });
+    }
+  }
+
+  for(const h of hits){
+    const parts=h.full.split('/');
+    const folder=parts.slice(0,-1).join('/');
+    const name=parts.pop();
+    const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
+    const item = (data||[]).find(x=>x.name===name);
+    const size = item?.metadata?.size||0;
+    const file={ name, full:h.full, size };
+    wrap.appendChild(rowFile(file));
   }
 }
+
 
   for(const h of hits){
     const parts=h.full.split('/');
