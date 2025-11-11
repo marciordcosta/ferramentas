@@ -681,9 +681,10 @@ function showAutocomplete(){
 }
   
 function onEnterSearch(event){
-if (event.key === 'Enter') {
-  el('#acList').style.display = 'none';
- }
+  if (event.key === 'Enter') {
+    el('#acList').style.display = 'none';
+    buscar();
+  }
 }
 
 function acPick(encFull){
@@ -755,6 +756,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
