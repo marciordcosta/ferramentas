@@ -99,6 +99,16 @@
   .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:12px}
   .folder-mini{display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer}
   .folder-mini:hover{background:#f3f4f6}
+  
+  #previewBox {
+  overflow-x: auto !important;
+}
+
+#previewBox .docx-wrapper {
+  margin: 0 !important;
+  max-width: none !important;
+}
+
 </style>
 <script src="https://unpkg.com/jszip/dist/jszip.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/docx-preview/dist/docx-preview.css" />
@@ -705,4 +715,5 @@ async function buscar(){
 
 </body>
 </html>
+
 
