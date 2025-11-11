@@ -91,6 +91,8 @@
   .actions span:hover{background:#f3f4f6}
   .actions .del{color:#b91c1c}
   .select-file{width:18px;height:18px;cursor:pointer}
+  .list-row.selected {border-color:#2563eb !important;background:#eef4ff !important}
+
 
   /* Modal */
   .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:300}
@@ -285,7 +287,7 @@ function rowFolder(f){
 }
 
 function rowFile(file){
-  const r=document.createElement('div'); r.className='list-row';
+  const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
   r.onclick = ()=> setPreview(file);
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
@@ -330,6 +332,16 @@ async function getSignedUrl(path){
 
 function setPreview(file){
   selectedFile = file;
+  // remove destaque anterior
+document.querySelectorAll('.list-row.selected').forEach(el => {
+  el.classList.remove('selected');
+});
+
+// destaca a linha atual
+if (file) {
+  const row = document.querySelector(`.list-row[data-full="${file.full}"]`);
+  if (row) row.classList.add('selected');
+}
   const meta = el('#previewMeta'); const box = el('#previewBox'); const send = el('#sendArea');
 
   if(!file){
@@ -737,6 +749,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
