@@ -6,7 +6,8 @@
 <title>Gerenciador</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded" />
-<style>
+
+<script src="https://unpkg.com/docx-preview/dist/docx-preview.min.js"></script><style>
   :root{
     --bg:#f5f7fb; --card:#fff; --text:#111827; --muted:#6b7280;
     --border:#e5e7eb; --primary:#2563eb; --primary-2:#1e40af;
@@ -346,6 +347,14 @@ async function previewImage(path){
   if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
   const url = URL.createObjectURL(data);
   box.innerHTML = `<img src='${url}' alt='preview'/>`;
+}
+
+async function previewDOCX(path){
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  const box = el('#previewBox');
+  if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar DOCX.</div>'; return; }
+  box.innerHTML = "";
+  docx.renderAsync(data, box);
 }
 
 async function previewPDF(path){
