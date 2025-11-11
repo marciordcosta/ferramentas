@@ -669,14 +669,22 @@ function showAutocomplete(){
 }
 
 function acPick(encFull){
-  const full=decodeURIComponent(encFull);
+  const full = decodeURIComponent(encFull);
+  const fileName = full.split('/').pop();
   const folder = full.split('/').slice(0,-1).join('/');
-  el('#q').value = full.split('/').pop();
-  el('#acList').style.display='none';
-  gotoFolder(folder).then(async()=>{
+
+  el('#q').value = fileName;      
+  el('#acList').style.display = 'none';
+
+  // Vai para a pasta
+  gotoFolder(folder).then(async () => {
+    // Depois de entrar na pasta → aplica o filtro automaticamente
+    await buscar();
+
+    // Depois do filtro → tenta abrir o preview do arquivo
     const { files } = await listChildren(folder);
-    const match = files.find(f=>f.full===full);
-    if(match) setPreview(match);
+    const match = files.find(f => f.full === full);
+    if (match) setPreview(match);
   });
 }
 
@@ -716,6 +724,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
