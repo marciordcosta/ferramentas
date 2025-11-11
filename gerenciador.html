@@ -289,6 +289,23 @@ function rowFolder(f){
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
   r.onclick = ()=> setPreview(file);
+  r.ondblclick = async (event) => {
+  event.stopPropagation();
+
+  // gerar URL temporária do supabase
+  const { data, error } = await supabase
+      .storage
+      .from(BUCKET)
+      .createSignedUrl(file.full, 3600);
+
+  if (error || !data?.signedUrl) {
+    alert('Erro ao abrir o arquivo.');
+    return;
+  }
+
+  // abrir em nova aba
+  window.open(data.signedUrl, '_blank');
+};
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
   // checkbox de seleção múltipla (apenas arquivos)
@@ -755,6 +772,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
