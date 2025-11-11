@@ -101,6 +101,7 @@
   .folder-mini:hover{background:#f3f4f6}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/docx-preview/dist/docx-preview.css" />
+<script src="https://unpkg.com/jszip/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/docx-preview/dist/docx-preview.min.js"></script>
 </head>
 <body>
@@ -333,7 +334,6 @@ function setPreview(file){
   const lower = file.name.toLowerCase();
   if(/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) return previewImage(file.full);
   if(/\.(pdf)$/i.test(lower)) return previewPDF(file.full);
-  if (/\.docx$/i.test(lower)) return previewDOCX(file.full);
 
   box.innerHTML = `<div style='padding:14px'>
     <div style='font-size:40px;margin-bottom:8px'>📄</div>
@@ -353,7 +353,19 @@ async function previewImage(path){
 
 
 async function previewDOCX(path){
-  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  const box = el('#previewBox');
+  box.innerHTML = '<div style="padding:14px">Carregando documento…</div>';
+  try{
+    const { data, error } = await supabase.storage.from(BUCKET).download(path);
+    if(error) throw error;
+    const arrayBuffer = await data.arrayBuffer();
+    box.innerHTML = "";
+    await docx.renderAsync(arrayBuffer, box);
+  }catch(err){
+    console.error('DOCX render error:', err);
+    box.innerHTML = 'Erro ao renderizar DOCX';
+  }
+} = await supabase.storage.from(BUCKET).download(path);
   const box = el('#previewBox');
   if(error){
     box.innerHTML='<div style="padding:14px">Falha ao carregar DOCX.</div>';
@@ -704,5 +716,4 @@ async function buscar(){
 
 </body>
 </html>
-
 
