@@ -289,7 +289,42 @@ function rowFolder(f){
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
   r.onclick = ()=> setPreview(file);
+  
   r.ondblclick = async (event) => {
+    event.stopPropagation();
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.full, 3600);
+    if (error || !data?.signedUrl) { alert('Erro ao abrir o arquivo.'); return; }
+    const url = data.signedUrl;
+    const ext = file.name.toLowerCase();
+    if(ext.endsWith('.docx')){
+      const win = window.open('', '_blank');
+      win.document.write(`
+      <html>
+      <head>
+        <meta charset=\"utf-8\" />
+        <title>${file.name}</title>
+        <link rel=\"stylesheet\" href=\"https://unpkg.com/docx-preview/dist/docx-preview.css\" />
+        <script src=\"https://unpkg.com/docx-preview/dist/docx-preview.min.js\"></script>
+      </head>
+      <body style=\"margin:0;padding:20px;overflow:auto;background:#f5f5f5;\">
+        <div id=\"viewer\"></div>
+        <script>
+          fetch(\"${url}\")
+            .then(r => r.blob())
+            .then(blob => {
+              docx.renderAsync(blob, document.getElementById(\"viewer\"))
+                .catch(err => {
+                  document.body.innerHTML = \"<h2 style='font-family:sans-serif;color:#b00'>Erro ao renderizar DOCX</h2>\";
+                });
+            });
+        </script>
+      </body>
+      </html>`);
+      return;
+    }
+    window.open(url, '_blank');
+  };
+r.ondblclick = async (event) => {
   event.stopPropagation();
 
   const { data, error } = await supabase
