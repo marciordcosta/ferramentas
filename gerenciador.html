@@ -62,6 +62,13 @@
   .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:12px}
   .folder-mini{display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer}
   .folder-mini:hover{background:#f3f4f6}
+
+  @media (max-width: 768px) {
+    main { flex-direction: column; }
+    aside.right { width: 100%; margin-top: 12px; }
+    .toolbar { flex-wrap: wrap; }
+    input[type=text] { min-width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -135,7 +142,7 @@ const clean = p => (p||"").replace(/^\/+|\/+$/g, "");
 function fmtSize(n){if(!n)return"-";const u=["B","KB","MB","GB"];let i=0;while(n>1024&&i<u.length-1){n/=1024;i++}return n.toFixed(1)+" "+u[i]}
 function escapeHtml(s){return (s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 
-/* === MOBILE NAVIGATION FUNCTION === */
+/* MOBILE: VOLTAR UMA PASTA */
 function goUpMobile(){
   if(!currentPath) return;
   const parts = currentPath.split('/');
@@ -173,219 +180,184 @@ function setCrumbs(){
   if(!currentPath) return;
   let acc='';
   currentPath.split('/').forEach(part=>{
-    acc = acc ? acc + '/' + part : part;
-
-    const sep=document.createElement('span');
-    sep.className='sep';
-    sep.textContent='›';
-
-    const seg=document.createElement('span');
-    seg.textContent=part;
+    acc = acc? acc+'/'+part : part;
+    const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›';
+    const seg=document.createElement('span'); seg.textContent=part;
     seg.onclick=()=>gotoFolder(acc);
-
-    bc.appendChild(sep);
-    bc.appendChild(seg);
+    bc.appendChild(sep); bc.appendChild(seg);
   });
 }
 
 /* === RENDER === */
-async function gotoFolder(prefix){
-  currentPath=clean(prefix||'');
-  setCrumbs();
-  await render();
-}
+async function gotoFolder(prefix){ currentPath=clean(prefix||''); setCrumbs(); await render(); }
 
 async function render(){
-  const wrap = el('#view');
-  wrap.innerHTML='';
-
+  const wrap = el('#view'); wrap.innerHTML='';
   const { folders, files } = await listChildren(currentPath);
-
-  const head=document.createElement('div');
-  head.className='list-head';
-  head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
-  wrap.appendChild(head);
-
+  const head=document.createElement('div'); head.className='list-head'; head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>'; wrap.appendChild(head);
   folders.forEach(f=> wrap.appendChild(rowFolder(f)) );
-  files.forEach(f=> wrap.appendChild(rowFile(f)) );
+  files.forEach(file=> wrap.appendChild(rowFile(file)) );
 
-  const pane=document.querySelector('aside.right');
-  if(currentPath==='' && files.length===0){
-    pane.style.visibility='hidden';
-    pane.style.pointerEvents='none';
-  } else {
-    pane.style.visibility='visible';
-    pane.style.pointerEvents='auto';
-  }
+  const pane = document.querySelector('aside.right');
+  if(currentPath==='' && files.length===0){ pane.style.visibility='hidden'; pane.style.pointerEvents='none'; }
+  else { pane.style.visibility='visible'; pane.style.pointerEvents='auto'; }
 
   setPreview(null);
 }
 
-/* === ROWS === */
+/* === LINHAS === */
 function rowFolder(f){
-  const r=document.createElement('div');
-  r.className='list-row';
+  const r = document.createElement('div');
+  r.className = 'list-row';
 
   r.innerHTML = `
     <div>📁</div>
     <div>
-      <div class="name" style="cursor:pointer" onclick="gotoFolder('${f.full}')">
+      <div class="name" style="cursor:pointer"
+           onclick="gotoFolder('${f.full}')">
         ${escapeHtml(f.name)}
       </div>
     </div>
     <div>-</div>
     <div class="actions">
-      <span class="icon" onclick="event.stopPropagation(); renameFolder('${f.full}')" title="Renomear">edit</span>
-      <span class="icon" onclick="event.stopPropagation(); openFolderPicker('move','${f.full}',true)" title="Mover">drive_file_move</span>
-      <span class="icon del" onclick="event.stopPropagation(); removeFolder('${f.full}')" title="Excluir">delete</span>
+      <span class="icon" title="Renomear"
+            onclick="event.stopPropagation(); renameFolder('${f.full}')">edit</span>
+      <span class="icon" title="Mover"
+            onclick="event.stopPropagation(); openFolderPicker('move','${f.full}',true)">drive_file_move</span>
+      <span class="icon del" title="Excluir"
+            onclick="event.stopPropagation(); removeFolder('${f.full}')">delete</span>
     </div>
   `;
+
   return r;
 }
 
 function rowFile(file){
-  const r=document.createElement('div');
-  r.className='list-row';
-  r.onclick=()=> setPreview(file);
+  const r=document.createElement('div'); r.className='list-row';
+  r.onclick = ()=> setPreview(file);
+  const folderPath = file.full.split('/').slice(0,-1).join('/');
 
-  const folderPath=file.full.split('/').slice(0,-1).join('/');
-
-  r.innerHTML = `
-    <div>📄</div>
+  r.innerHTML=`<div>📄</div>
     <div>
-      <div class="name">${escapeHtml(file.name)}</div>
-      <div class="path">${escapeHtml(folderPath)}</div>
+      <div class='name'>${escapeHtml(file.name)}</div>
+      <div class='path'>${escapeHtml(folderPath)}</div>
     </div>
     <div>${fmtSize(file.size)}</div>
-    <div class="actions">
-      <span class="icon" onclick="event.stopPropagation(); downloadFile('${file.full}')" title="Baixar">download</span>
-      <span class="icon" onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')" title="Mover">drive_file_move</span>
-      <span class="icon" onclick="event.stopPropagation(); renameFile('${file.full}')" title="Renomear">edit</span>
-      <span class="icon del" onclick="event.stopPropagation(); deleteFile('${file.full}')" title="Excluir">delete</span>
-    </div>
-  `;
+    <div class='actions'>
+      <span class='icon' title='Baixar' onclick="event.stopPropagation(); downloadFile('${file.full}')">download</span>
+      <span class='icon' title='Mover' onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')">drive_file_move</span>
+      <span class='icon' title='Renomear' onclick="event.stopPropagation(); renameFile('${file.full}')">edit</span>
+      <span class='icon del' title='Excluir' onclick="event.stopPropagation(); deleteFile('${file.full}')">delete</span>
+    </div>`;
   return r;
 }
 
 /* === PREVIEW === */
 async function getSignedUrl(path){
-  const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path,3600);
-  return data ? data.signedUrl : null;
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+  if(error) return null; return data.signedUrl;
 }
 
 function setPreview(file){
-  selectedFile=file;
-  const meta=el('#previewMeta');
-  const box=el('#previewBox');
-  const send=el('#sendArea');
+  selectedFile = file;
+  const meta = el('#previewMeta'); const box = el('#previewBox');
+  const send = el('#sendArea');
 
-  if(!file){
-    meta.textContent='Selecione um arquivo';
-    box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>';
-    send.style.display='none';
-    return;
-  }
+  if(!file){ meta.textContent='Selecione um arquivo'; box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>'; send.style.display='none'; return; }
 
   meta.textContent = `${file.full} • ${fmtSize(file.size)}`;
   send.style.display='flex';
 
-  const lower=file.name.toLowerCase();
-  if(/\.(png|jpe?g|gif|bmp|webp)$/i.test(lower)) return previewImage(file.full);
-  if(/\.pdf$/i.test(lower)) return previewPDF(file.full);
+  const lower = file.name.toLowerCase();
+  if(/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) return previewImage(file.full);
+  if(/\.(pdf)$/i.test(lower)) return previewPDF(file.full);
 
-  box.innerHTML = `
-    <div style='padding:14px'>
-      <div style='font-size:40px;margin-bottom:8px'>📄</div>
-      <div style='font-weight:600;margin-bottom:4px'>${escapeHtml(file.name)}</div>
-      <div class="path">${escapeHtml(file.full)}</div>
-      <div class="path">Tamanho: ${fmtSize(file.size)}</div>
-    </div>
-  `;
+  box.innerHTML = `<div style='padding:14px'>
+    <div style='font-size:40px;margin-bottom:8px'>📄</div>
+    <div style='font-weight:600;margin-bottom:4px'>${escapeHtml(file.name)}</div>
+    <div class='path'>${escapeHtml(file.full)}</div>
+    <div class='path'>Tamanho: ${fmtSize(file.size)}</div>
+  </div>`;
 }
 
 async function previewImage(path){
-  const { data } = await supabase.storage.from(BUCKET).download(path);
-  const url=URL.createObjectURL(data);
-  el('#previewBox').innerHTML=`<img src='${url}'/>`;
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
+  const url = URL.createObjectURL(data); box.innerHTML = `<img src='${url}' alt='preview'/>`;
 }
-
 async function previewPDF(path){
-  const { data } = await supabase.storage.from(BUCKET).download(path);
-  const url=URL.createObjectURL(data);
-  el('#previewBox').innerHTML=`<iframe class='pdf' src='${url}'></iframe>`;
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar PDF.</div>'; return; }
+  const url = URL.createObjectURL(data); box.innerHTML = `<iframe class='pdf' src='${url}'></iframe>`;
 }
 
-/* === SEND === */
+/* === ENVIAR === */
 async function sendWhatsApp(){
   if(!selectedFile) return;
-  const url=await getSignedUrl(selectedFile.full);
-  if(!url){ alert('Erro ao gerar link.'); return; }
-  const text=`Segue o arquivo: ${selectedFile.full}\n${url}`;
+  const url = await getSignedUrl(selectedFile.full);
+  if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; }
+  const text = `Segue o arquivo: ${selectedFile.full}
+${url}`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
 }
 async function sendEmail(){
   if(!selectedFile) return;
-  const url=await getSignedUrl(selectedFile.full);
-  if(!url){ alert('Erro ao gerar link.'); return; }
-  const subject='Envio de arquivo';
-  const body=`Segue o arquivo: ${selectedFile.full}\n${url}`;
-  window.location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const url = await getSignedUrl(selectedFile.full);
+  if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; }
+  const subject = 'Envio de arquivo';
+  const body = `Segue o arquivo: ${selectedFile.full}
+${url}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-/* === FILE ACTIONS === */
+/* === AÇÕES ARQUIVO === */
 async function downloadFile(full){
-  const { data }=await supabase.storage.from(BUCKET).download(full);
-  const url=URL.createObjectURL(data);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=full.split('/').pop();
-  a.click();
-  URL.revokeObjectURL(url);
+  const { data, error } = await supabase.storage.from(BUCKET).download(full);
+  if(error){ alert('Falha ao baixar.'); return; }
+  const url = URL.createObjectURL(data); const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop(); a.click(); URL.revokeObjectURL(url);
 }
 async function deleteFile(full){
   if(!confirm('Excluir arquivo?')) return;
-  await supabase.storage.from(BUCKET).remove([full]);
+  const { error } = await supabase.storage.from(BUCKET).remove([full]);
+  if(error){ alert('Falha ao excluir.'); return; }
   await render(); await rebuildIndex();
 }
 async function renameFile(full){
   const parts=full.split('/');
   const old=parts.pop();
   const parent=parts.join('/');
-  const novo=prompt('Novo nome:', old);
+  const novo=prompt('Novo nome do arquivo:', old);
   if(!novo||novo===old) return;
-  await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`);
+  const { error } = await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`);
+  if(error){ alert('Falha ao renomear.'); return; }
   await render(); await rebuildIndex();
 }
 
-/* === FOLDER ACTIONS === */
+/* === AÇÕES PASTA === */
 async function renameFolder(full){
   const parts=full.split('/');
   const old=parts.pop();
   const parent=parts.join('/');
   const novo=prompt('Novo nome da pasta:', old);
   if(!novo||novo===old) return;
-
   const items=await listAllUnder(full);
   await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), {upsert:true});
-
   for(const p of items){
     const rest=p.slice(full.length+1);
     await supabase.storage.from(BUCKET).move(p, `${parent?parent+'/':''}${novo}/${rest}`);
   }
-
   await supabase.storage.from(BUCKET).remove([`${full}/.init`]).catch(()=>{});
-
   await render(); await rebuildIndex();
 }
-
 async function removeFolder(full){
-  if(!confirm(`Excluir esta pasta e todo conteúdo?\n${full}`)) return;
+  if(!confirm(`Excluir a pasta e todo o conteúdo?
+${full}`)) return;
   const items=await listAllUnder(full);
   if(items.length===0) items.push(`${full}/.init`);
-  await supabase.storage.from(BUCKET).remove(items);
+  const { error } = await supabase.storage.from(BUCKET).remove(items);
+  if(error){ alert('Falha ao excluir pasta.'); return; }
   await render(); await rebuildIndex();
 }
-
 async function listAllUnder(prefix){
   const out=[], q=[prefix];
   while(q.length){
@@ -401,51 +373,41 @@ async function listAllUnder(prefix){
   return out;
 }
 
-/* === UPLOAD / MOVE === */
+/* === UPLOAD / MOVER (MODAL) === */
 function pickFiles(){ el('#filePick').click(); }
 el('#filePick').addEventListener('change', e=>{
-  uploadQueue=Array.from(e.target.files||[]);
+  uploadQueue = Array.from(e.target.files||[]);
   openFolderPicker('pick');
 });
 
 function openFolderPicker(mode, sourceFull=null, isFolderMove=false){
   dlgMode=mode;
-  el('#dlgTitle').textContent = mode==='pick'
-    ? 'Selecionar pasta de destino'
-    : (isFolderMove?'Mover conteúdo da pasta…':'Mover arquivo para…');
-
+  el('#dlgTitle').textContent = mode==='pick' ? 'Selecionar pasta de destino' :
+    (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
   const dlg=el('#dlg');
   dlg.style.display='flex';
-  dlg.dataset.source=sourceFull||'';
-  dlg.dataset.isFolderMove=isFolderMove?'1':'0';
-
+  dlg.dataset.source = sourceFull || '';
+  dlg.dataset.isFolderMove = isFolderMove ? '1':'0';
   loadDlgFolders();
 }
-
 function hideDlg(){ el('#dlg').style.display='none'; }
 function closeDlg(e){ if(e.target.id==='dlg') hideDlg(); }
 
 async function loadDlgFolders(){
-  const grid=el('#dlgFolders');
-  grid.innerHTML='';
-
+  const grid=el('#dlgFolders'); grid.innerHTML='';
   const folders=await listAllFolders();
   folders.forEach(f=>{
-    const d=document.createElement('div');
-    d.className='folder-mini';
-    d.innerHTML=`
-      <div>📁</div>
-      <div style='flex:1;min-width:0'>${escapeHtml(f)}</div>
-      <div style='display:flex;gap:6px'>
-        <span class='icon' onclick="renameFolder('${f}')">edit</span>
-        <span class='icon del' onclick="removeFolder('${f}')">delete</span>
-      </div>
-    `;
+    const d=document.createElement('div'); d.className='folder-mini';
+    d.innerHTML=`<div>📁</div>
+    <div style='flex:1;min-width:0'>${escapeHtml(f)}</div>
+    <div style='display:flex;gap:6px'>
+      <span class='icon' onclick="renameFolder('${f}')">edit</span>
+      <span class='icon del' onclick="removeFolder('${f}')">delete</span>
+    </div>`;
     d.ondblclick=()=> selectFolderForAction(f);
     grid.appendChild(d);
   });
 }
-
 async function listAllFolders(){
   const out=[];
   async function scan(prefix){
@@ -454,8 +416,7 @@ async function listAllFolders(){
       if(it.name==='.init') continue;
       if(!(it.metadata && typeof it.metadata.size==='number')){
         const full=clean(prefix?`${prefix}/${it.name}`:it.name);
-        out.push(full);
-        await scan(full);
+        out.push(full); await scan(full);
       }
     }
   }
@@ -464,67 +425,57 @@ async function listAllFolders(){
 }
 
 async function selectFolderForAction(dest){
-  const dlg=el('#dlg');
-  const src=dlg.dataset.source||'';
-  const isFolderMove = dlg.dataset.isFolderMove==='1';
-
-  if(dlgMode==='pick'){
-    await doUploadTo(dest);
-  } else {
+  const dlg=el('#dlg'); const src=dlg.dataset.source||''; const isFolderMove = dlg.dataset.isFolderMove==='1';
+  if(dlgMode==='pick'){ await doUploadTo(dest); }
+  else {
     if(isFolderMove) await moveFolderContents(src,dest);
     else await doMoveFileTo(src,dest);
   }
-
   hideDlg();
 }
-
 async function doUploadTo(dest){
   if(!uploadQueue.length) return;
   for(const file of uploadQueue){
     const path=`${dest}/${file.name}`;
-    const { error }=await supabase.storage.from(BUCKET).upload(path,file,{upsert:true});
-    if(error){ alert('Erro ao enviar em '+path); return; }
+    const { error } = await supabase.storage.from(BUCKET).upload(path,file,{upsert:true});
+    if(error){ alert('Falha no upload em '+path); return; }
   }
-  uploadQueue=[];
-  el('#filePick').value='';
+  uploadQueue=[]; el('#filePick').value='';
   if(clean(dest)===clean(currentPath)) await render();
   await rebuildIndex();
   alert('Upload concluído.');
 }
-
 async function doMoveFileTo(from,dest){
   if(!from) return;
   const name=from.split('/').pop();
   const to=`${dest}/${name}`;
-  const { error }=await supabase.storage.from(BUCKET).move(from,to);
-  if(error){ alert('Erro ao mover.'); return; }
-  await render(); await rebuildIndex();
+  const { error } = await supabase.storage.from(BUCKET).move(from,to);
+  if(error){ alert('Falha ao mover.'); return; }
+  await render();
+  await rebuildIndex();
   alert('Movido.');
 }
-
 async function moveFolderContents(fromFolder,destFolder){
   const items=await listAllUnder(fromFolder);
   for(const p of items){
     const name=p.split('/').pop();
     const to=`${destFolder}/${name}`;
     const { error }=await supabase.storage.from(BUCKET).move(p,to);
-    if(error){ alert('Erro ao mover alguns itens.'); return; }
+    if(error){ alert('Falha ao mover algum item.'); return; }
   }
-  await render(); await rebuildIndex();
+  await render();
+  await rebuildIndex();
   alert('Conteúdo movido.');
 }
-
 async function criarPastaFromDlg(){
   const name=clean(el('#newFolderName').value);
   if(!name) return;
   await supabase.storage.from(BUCKET).upload(`${name}/.init`, new Blob(['']), {upsert:true});
   el('#newFolderName').value='';
-  await loadDlgFolders();
-  await render();
-  await rebuildIndex();
+  await loadDlgFolders(); await render(); await rebuildIndex();
 }
 
-/* === SEARCH + AUTOCOMPLETE === */
+/* === BUSCA + AUTOCOMPLETE === */
 async function rebuildIndex(){
   const out=[];
   async function scan(prefix){
@@ -532,97 +483,57 @@ async function rebuildIndex(){
     for(const it of (data||[])){
       if(it.name==='.init') continue;
       const full=clean(prefix?`${prefix}/${it.name}`:it.name);
-      if(it.metadata && typeof it.metadata.size==='number'){
-        out.push({name:it.name, full});
-      } else {
-        await scan(full);
-      }
+      if(it.metadata && typeof it.metadata.size==='number'){ out.push({name:it.name, full}); }
+      else { await scan(full); }
     }
   }
   await scan('');
-  acIndex=out;
+  acIndex = out;
 }
-
-function onTypeSearch(){
-  clearTimeout(acTimer);
-  acTimer=setTimeout(showAutocomplete,150);
-}
-
+function onTypeSearch(){ clearTimeout(acTimer); acTimer = setTimeout(showAutocomplete, 150); }
 function showAutocomplete(){
   const term=(el('#q').value||'').trim().toLowerCase();
   const box=el('#acList');
-
-  if(!term){
-    box.style.display='none';
-    box.innerHTML='';
-    return;
-  }
-
-  if(!acIndex.length){
-    rebuildIndex().then(showAutocomplete);
-    return;
-  }
-
-  const results=acIndex.filter(x=>x.full.toLowerCase().includes(term)).slice(0,12);
-  if(!results.length){
-    box.style.display='none';
-    box.innerHTML='';
-    return;
-  }
-
-  box.innerHTML = results.map(r=>`
-    <div class='opt' onclick="acPick('${encodeURIComponent(r.full)}')">📄
+  if(!term){ box.style.display='none'; box.innerHTML=''; return; }
+  if(!acIndex.length){ rebuildIndex().then(showAutocomplete); return; }
+  const results = acIndex.filter(x=>x.full.toLowerCase().includes(term)).slice(0,12);
+  if(!results.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.innerHTML = results.map(r=>`<div class='opt' onclick="acPick('${encodeURIComponent(r.full)}')">📄 
       <div style='min-width:0'>
         <div>${escapeHtml(r.name)}</div>
         <div class='path'>${escapeHtml(r.full)}</div>
       </div>
-    </div>
-  `).join('');
-
+    </div>`).join('');
   box.style.display='block';
 }
-
 function acPick(encFull){
   const full=decodeURIComponent(encFull);
-  const folder=full.split('/').slice(0,-1).join('/');
-  el('#q').value=full.split('/').pop();
+  const folder = full.split('/').slice(0,-1).join('/');
+  el('#q').value = full.split('/').pop();
   el('#acList').style.display='none';
-
   gotoFolder(folder).then(async()=>{
     const { files } = await listChildren(folder);
-    const match=files.find(f=>f.full===full);
+    const match = files.find(f=>f.full===full);
     if(match) setPreview(match);
   });
 }
-
 async function buscar(){
   const term=(el('#q').value||'').trim().toLowerCase();
   if(!term){ alert('Digite algo para buscar.'); return; }
-
   if(!acIndex.length) await rebuildIndex();
-
-  const hits=acIndex.filter(x=>x.full.toLowerCase().includes(term));
-  const wrap=el('#view');
-  wrap.innerHTML='';
-
-  const head=document.createElement('div');
-  head.className='list-head';
+  const hits = acIndex.filter(x=>x.full.toLowerCase().includes(term));
+  const wrap=el('#view'); wrap.innerHTML='';
+  const head=document.createElement('div'); head.className='list-head';
   head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
   wrap.appendChild(head);
-
   for(const h of hits){
-    const parts=h.full.split('/');
-    const folder=parts.slice(0,-1).join('/');
-    const name=parts.pop();
-
-    const { data }=await supabase.storage.from(BUCKET).list(folder,{limit:2000});
-    const item=(data||[]).find(x=>x.name===name);
-    const size=item?.metadata?.size||0;
-
-    const file={name, full:h.full, size};
+    const parts=h.full.split('/'); const folder=parts.slice(0,-1).join('/'); const name=parts.pop();
+    const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
+    const item = (data||[]).find(x=>x.name===name);
+    const size = item?.metadata?.size||0;
+    const file={ name, full:h.full, size };
     wrap.appendChild(rowFile(file));
   }
-
   setPreview(null);
 }
 
