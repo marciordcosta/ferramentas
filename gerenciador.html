@@ -289,7 +289,6 @@ function rowFolder(f){
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
   r.onclick = ()=> setPreview(file);
-  r.ondblclick = ()=> { if(file.name.toLowerCase().endsWith('.docx')) { openDocxViewer(file.full, file.name); } };
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
   // checkbox de seleção múltipla (apenas arquivos)
@@ -745,41 +744,6 @@ async function buscar(){
   }
 
   }
-
-
-async function openDocxViewer(path, filename) {
-  const { data, error } = await supabase.storage.from(BUCKET).download(path);
-  if (error) {
-    alert("Erro ao abrir arquivo.");
-    return;
-  }
-  const reader = new FileReader();
-  reader.onloadend = function() {
-    const base64 = reader.result;
-    const win = window.open("", "_blank");
-    win.document.write(`
-      <html>
-      <head>
-        <title>${filename}</title>
-        <script src="https://unpkg.com/docx-preview/dist/docx-preview.min.js"></script>
-        <style>body{margin:0;padding:20px;background:#f0f0f0;}</style>
-      </head>
-      <body>
-        <div id="preview"></div>
-        <script>
-          const base64 = "${base64}";
-          fetch(base64)
-            .then(r => r.blob())
-            .then(blob => docx.renderAsync(blob, document.getElementById("preview")))
-            .catch(err => { document.body.innerHTML="<h2>Erro ao renderizar DOCX</h2>"; });
-        </script>
-      </body>
-      </html>
-    `);
-    win.document.close();
-  };
-  reader.readAsDataURL(data);
-}
 
 /* === BOOT === */
 (async function(){
