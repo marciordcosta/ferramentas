@@ -114,6 +114,8 @@
   </div>
   <button onclick="buscar()"><span class="icon">search</span></button>
   <button class="primary" onclick="pickFiles()"><span class="icon">upload</span> Enviar</button>
+  <!-- Ícone "+" para criar pasta na pasta atual -->
+  <button onclick="openCreateFolder()" title="Nova pasta"><span class="icon">add</span></button>
   <input id="filePick" type="file" multiple style="display:none" />
 </div>
 
@@ -163,7 +165,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentPath = "";
 let uploadQueue = [];
 let selectedFile = null;
-let dlgMode = "pick";
+let dlgMode = "pick"; // 'pick' upload | 'move' mover | 'create' criar pasta
 let acIndex = []; let acTimer = null;
 
 const el = s => document.querySelector(s);
@@ -219,7 +221,7 @@ async function render(){
 
   const pane = document.querySelector('aside.right');
   if(currentPath==='' && files.length===0){
-    pane.style.visibility='hidden'; pane.style.pointerEvents='none';
+    pane.style.visibility='hidden'; pane.style.pointerEvents='none'; 
   } else {
     pane.style.visibility='visible'; pane.style.pointerEvents='auto';
   }
@@ -493,12 +495,39 @@ async function moveFolderContents(fromFolder,destFolder){
   await rebuildIndex();
   alert('Conteúdo movido.');
 }
+
+/* === CRIAÇÃO DE PASTA PELO BOTÃO "+" === */
+function openCreateFolder(){
+  el('#dlgTitle').textContent = "Criar pasta";
+  el('#newFolderName').value = "";
+  const dlg = el('#dlg');
+  dlg.style.display = 'flex';
+  dlg.dataset.source = "";
+  dlg.dataset.isFolderMove = "0";
+  dlgMode = "create";
+  // Não carrega lista; foca só em criar
+  el('#newFolderName').focus();
+}
+
 async function criarPastaFromDlg(){
   const name=clean(el('#newFolderName').value);
   if(!name) return;
-  await supabase.storage.from(BUCKET).upload(`${name}/.init`, new Blob(['']), {upsert:true});
+
+  // Se veio do botão "+", criar dentro da pasta atual
+  let dest;
+  if (dlgMode === 'create') {
+    dest = currentPath ? `${currentPath}/${name}` : name;
+  } else {
+    // comportamento anterior preservado quando modal é usado por outras ações
+    dest = name;
+  }
+
+  await supabase.storage.from(BUCKET).upload(`${dest}/.init`, new Blob(['']), {upsert:true});
   el('#newFolderName').value='';
-  await loadDlgFolders(); await render(); await rebuildIndex();
+  hideDlg();
+  await render();
+  await rebuildIndex();
+  alert('Pasta criada.');
 }
 
 /* === BUSCA + AUTOCOMPLETE === */
