@@ -673,18 +673,31 @@ function acPick(encFull){
   const fileName = full.split('/').pop();
   const folder = full.split('/').slice(0,-1).join('/');
 
-  el('#q').value = fileName;      
+  el('#q').value = fileName;
   el('#acList').style.display = 'none';
 
-  // Vai para a pasta
+  // Vai para a pasta normalmente
   gotoFolder(folder).then(async () => {
-    // Depois de entrar na pasta → aplica o filtro automaticamente
-    await buscar();
 
-    // Depois do filtro → tenta abrir o preview do arquivo
+    // Após entrar na pasta, filtramos APENAS dentro da pasta
     const { files } = await listChildren(folder);
     const match = files.find(f => f.full === full);
-    if (match) setPreview(match);
+
+    // Limpa a lista atual
+    const wrap = el('#view');
+    wrap.innerHTML = '';
+
+    // Cabeçalho
+    const head = document.createElement('div');
+    head.className = 'list-head';
+    head.innerHTML = '<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
+    wrap.appendChild(head);
+
+    // Se achou o arquivo → exibe somente ele
+    if (match) {
+      wrap.appendChild(rowFile(match));
+      setPreview(match);
+    }
   });
 }
 
@@ -724,6 +737,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
