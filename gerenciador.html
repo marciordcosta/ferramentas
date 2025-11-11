@@ -62,6 +62,56 @@
   .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:12px}
   .folder-mini{display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer}
   .folder-mini:hover{background:#f3f4f6}
+
+  /* ===== MOBILE BOTTOM BAR ===== */
+  @media (max-width: 768px) {
+
+    main {
+      padding-bottom: 70px;
+      flex-direction: column;
+    }
+
+    aside.right {
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .toolbar {
+      flex-wrap: wrap;
+    }
+
+    input[type=text] {
+      min-width: 100%;
+    }
+
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 58px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 999;
+    }
+
+    .bottom-bar button {
+      flex-direction: column;
+      background: transparent;
+      border: none;
+      padding: 4px;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .bottom-bar button .icon {
+      font-size: 26px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -113,6 +163,34 @@
   </div>
 </div>
 
+<!-- BOTTOM BAR MOBILE -->
+<div class="bottom-bar">
+  <button onclick="gotoFolder('')">
+    <span class="icon">home</span>
+    Home
+  </button>
+
+  <button onclick="document.querySelector('#q').focus()">
+    <span class="icon">search</span>
+    Buscar
+  </button>
+
+  <button onclick="pickFiles()">
+    <span class="icon">upload</span>
+    Upload
+  </button>
+
+  <button onclick="goUpMobile()">
+    <span class="icon">arrow_back</span>
+    Voltar
+  </button>
+
+  <button onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <span class="icon">arrow_upward</span>
+    Topo
+  </button>
+</div>
+
 <script>
 /* === CONFIG === */
 const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
@@ -126,13 +204,22 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentPath = "";
 let uploadQueue = [];
 let selectedFile = null;
-let dlgMode = "pick"; // 'pick' upload | 'move' mover
-let acIndex = []; let acTimer = null;
+let dlgMode = "pick";
+let acIndex = [];
+let acTimer = null;
 
 const el = s => document.querySelector(s);
 const clean = p => (p||"").replace(/^\/+|\/+$/g, "");
 function fmtSize(n){if(!n)return"-";const u=["B","KB","MB","GB"];let i=0;while(n>1024&&i<u.length-1){n/=1024;i++}return n.toFixed(1)+" "+u[i]}
-function escapeHtml(s){return (s||"").replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
+function escapeHtml(s){return (s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
+
+/* MOBILE: VOLTAR UMA PASTA */
+function goUpMobile(){
+  if(!currentPath) return;
+  const parts = currentPath.split('/');
+  parts.pop();
+  gotoFolder(parts.join('/'));
+}
 
 /* === AUTH === */
 async function ensureAuth(){
@@ -162,7 +249,14 @@ function setCrumbs(){
   const bc = el('#breadcrumbs'); bc.innerHTML='';
   const root=document.createElement('span'); root.textContent='Arquivos'; root.onclick=()=>gotoFolder(''); bc.appendChild(root);
   if(!currentPath) return;
-  let acc=''; currentPath.split('/').forEach(part=>{ acc = acc? acc+'/'+part : part; const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›'; const seg=document.createElement('span'); seg.textContent=part; seg.onclick=()=>gotoFolder(acc); bc.appendChild(sep); bc.appendChild(seg); });
+  let acc='';
+  currentPath.split('/').forEach(part=>{
+    acc = acc? acc+'/'+part : part;
+    const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›';
+    const seg=document.createElement('span'); seg.textContent=part;
+    seg.onclick=()=>gotoFolder(acc);
+    bc.appendChild(sep); bc.appendChild(seg);
+  });
 }
 
 /* === RENDER === */
@@ -175,7 +269,6 @@ async function render(){
   folders.forEach(f=> wrap.appendChild(rowFolder(f)) );
   files.forEach(file=> wrap.appendChild(rowFile(file)) );
 
-  // Pré-visualização: escondida na raiz (só pastas)
   const pane = document.querySelector('aside.right');
   if(currentPath==='' && files.length===0){ pane.style.visibility='hidden'; pane.style.pointerEvents='none'; }
   else { pane.style.visibility='visible'; pane.style.pointerEvents='auto'; }
@@ -209,7 +302,7 @@ function rowFolder(f){
 
   return r;
 }
-  
+
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row';
   r.onclick = ()=> setPreview(file);
@@ -269,10 +362,23 @@ async function previewPDF(path){
 }
 
 /* === ENVIAR === */
-async function sendWhatsApp(){ if(!selectedFile) return; const url = await getSignedUrl(selectedFile.full); if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; } const text = `Segue o arquivo: ${selectedFile.full}
-${url}`; window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank'); }
-async function sendEmail(){ if(!selectedFile) return; const url = await getSignedUrl(selectedFile.full); if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; } const subject = 'Envio de arquivo'; const body = `Segue o arquivo: ${selectedFile.full}
-${url}`; window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }
+async function sendWhatsApp(){
+  if(!selectedFile) return;
+  const url = await getSignedUrl(selectedFile.full);
+  if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; }
+  const text = `Segue o arquivo: ${selectedFile.full}
+${url}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
+}
+async function sendEmail(){
+  if(!selectedFile) return;
+  const url = await getSignedUrl(selectedFile.full);
+  if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; }
+  const subject = 'Envio de arquivo';
+  const body = `Segue o arquivo: ${selectedFile.full}
+${url}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 
 /* === AÇÕES ARQUIVO === */
 async function downloadFile(full){
@@ -280,22 +386,78 @@ async function downloadFile(full){
   if(error){ alert('Falha ao baixar.'); return; }
   const url = URL.createObjectURL(data); const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop(); a.click(); URL.revokeObjectURL(url);
 }
-async function deleteFile(full){ if(!confirm('Excluir arquivo?')) return; const { error } = await supabase.storage.from(BUCKET).remove([full]); if(error){ alert('Falha ao excluir.'); return; } await render(); await rebuildIndex(); }
-async function renameFile(full){ const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/'); const novo=prompt('Novo nome do arquivo:', old); if(!novo||novo===old) return; const { error } = await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`); if(error){ alert('Falha ao renomear.'); return; } await render(); await rebuildIndex(); }
+async function deleteFile(full){
+  if(!confirm('Excluir arquivo?')) return;
+  const { error } = await supabase.storage.from(BUCKET).remove([full]);
+  if(error){ alert('Falha ao excluir.'); return; }
+  await render(); await rebuildIndex();
+}
+async function renameFile(full){
+  const parts=full.split('/');
+  const old=parts.pop();
+  const parent=parts.join('/');
+  const novo=prompt('Novo nome do arquivo:', old);
+  if(!novo||novo===old) return;
+  const { error } = await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`);
+  if(error){ alert('Falha ao renomear.'); return; }
+  await render(); await rebuildIndex();
+}
 
 /* === AÇÕES PASTA === */
-async function renameFolder(full){ const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/'); const novo=prompt('Novo nome da pasta:', old); if(!novo||novo===old) return; const items=await listAllUnder(full); await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), {upsert:true}); for(const p of items){ const rest=p.slice(full.length+1); await supabase.storage.from(BUCKET).move(p, `${parent?parent+'/':''}${novo}/${rest}`); } await supabase.storage.from(BUCKET).remove([`${full}/.init`]).catch(()=>{}); await render(); await rebuildIndex(); }
-async function removeFolder(full){ if(!confirm(`Excluir a pasta e todo o conteúdo?
-${full}`)) return; const items=await listAllUnder(full); if(items.length===0) items.push(`${full}/.init`); const { error } = await supabase.storage.from(BUCKET).remove(items); if(error){ alert('Falha ao excluir pasta.'); return; } await render(); await rebuildIndex(); }
-async function listAllUnder(prefix){ const out=[], q=[prefix]; while(q.length){ const p=q.shift(); const { data }=await supabase.storage.from(BUCKET).list(p,{limit:2000}); for(const it of (data||[])){ if(it.name==='.init') continue; const full=clean(`${p}/${it.name}`); if(it.metadata && typeof it.metadata.size==='number') out.push(full); else q.push(full); } } return out; }
+async function renameFolder(full){
+  const parts=full.split('/');
+  const old=parts.pop();
+  const parent=parts.join('/');
+  const novo=prompt('Novo nome da pasta:', old);
+  if(!novo||novo===old) return;
+  const items=await listAllUnder(full);
+  await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), {upsert:true});
+  for(const p of items){
+    const rest=p.slice(full.length+1);
+    await supabase.storage.from(BUCKET).move(p, `${parent?parent+'/':''}${novo}/${rest}`);
+  }
+  await supabase.storage.from(BUCKET).remove([`${full}/.init`]).catch(()=>{});
+  await render(); await rebuildIndex();
+}
+async function removeFolder(full){
+  if(!confirm(`Excluir a pasta e todo o conteúdo?
+${full}`)) return;
+  const items=await listAllUnder(full);
+  if(items.length===0) items.push(`${full}/.init`);
+  const { error } = await supabase.storage.from(BUCKET).remove(items);
+  if(error){ alert('Falha ao excluir pasta.'); return; }
+  await render(); await rebuildIndex();
+}
+async function listAllUnder(prefix){
+  const out=[], q=[prefix];
+  while(q.length){
+    const p=q.shift();
+    const { data }=await supabase.storage.from(BUCKET).list(p,{limit:2000});
+    for(const it of (data||[])){
+      if(it.name==='.init') continue;
+      const full=clean(`${p}/${it.name}`);
+      if(it.metadata && typeof it.metadata.size==='number') out.push(full);
+      else q.push(full);
+    }
+  }
+  return out;
+}
 
 /* === UPLOAD / MOVER (MODAL) === */
 function pickFiles(){ el('#filePick').click(); }
-el('#filePick').addEventListener('change', e=>{ uploadQueue = Array.from(e.target.files||[]); openFolderPicker('pick'); });
+el('#filePick').addEventListener('change', e=>{
+  uploadQueue = Array.from(e.target.files||[]);
+  openFolderPicker('pick');
+});
 
 function openFolderPicker(mode, sourceFull=null, isFolderMove=false){
-  dlgMode=mode; el('#dlgTitle').textContent = mode==='pick' ? 'Selecionar pasta de destino' : (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
-  const dlg=el('#dlg'); dlg.style.display='flex'; dlg.dataset.source = sourceFull || ''; dlg.dataset.isFolderMove = isFolderMove ? '1':'0';
+  dlgMode=mode;
+  el('#dlgTitle').textContent = mode==='pick' ? 'Selecionar pasta de destino' :
+    (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
+  const dlg=el('#dlg');
+  dlg.style.display='flex';
+  dlg.dataset.source = sourceFull || '';
+  dlg.dataset.isFolderMove = isFolderMove ? '1':'0';
   loadDlgFolders();
 }
 function hideDlg(){ el('#dlg').style.display='none'; }
@@ -306,28 +468,40 @@ async function loadDlgFolders(){
   const folders=await listAllFolders();
   folders.forEach(f=>{
     const d=document.createElement('div'); d.className='folder-mini';
-    d.innerHTML=`<div>📁</div><div style='flex:1;min-width:0'>${escapeHtml(f)}</div><div style='display:flex;gap:6px'><span class='icon' onclick="renameFolder('${f}')">edit</span><span class='icon del' onclick="removeFolder('${f}')">delete</span></div>`;
+    d.innerHTML=`<div>📁</div>
+    <div style='flex:1;min-width:0'>${escapeHtml(f)}</div>
+    <div style='display:flex;gap:6px'>
+      <span class='icon' onclick="renameFolder('${f}')">edit</span>
+      <span class='icon del' onclick="removeFolder('${f}')">delete</span>
+    </div>`;
     d.ondblclick=()=> selectFolderForAction(f);
     grid.appendChild(d);
   });
 }
 async function listAllFolders(){
-  const out=[]; async function scan(prefix){
+  const out=[];
+  async function scan(prefix){
     const { data }=await supabase.storage.from(BUCKET).list(prefix||'',{limit:2000,sortBy:{column:'name',order:'asc'}});
     for(const it of (data||[])){
       if(it.name==='.init') continue;
       if(!(it.metadata && typeof it.metadata.size==='number')){
         const full=clean(prefix?`${prefix}/${it.name}`:it.name);
-        out.push(full); await scan(full);
+        out.push(full);
+        await scan(full);
       }
     }
-  } await scan(''); return out;
+  }
+  await scan('');
+  return out;
 }
 
 async function selectFolderForAction(dest){
   const dlg=el('#dlg'); const src=dlg.dataset.source||''; const isFolderMove = dlg.dataset.isFolderMove==='1';
   if(dlgMode==='pick'){ await doUploadTo(dest); }
-  else { if(isFolderMove) await moveFolderContents(src,dest); else await doMoveFileTo(src,dest); }
+  else {
+    if(isFolderMove) await moveFolderContents(src,dest);
+    else await doMoveFileTo(src,dest);
+  }
   hideDlg();
 }
 async function doUploadTo(dest){
@@ -374,7 +548,8 @@ async function criarPastaFromDlg(){
 
 /* === BUSCA + AUTOCOMPLETE === */
 async function rebuildIndex(){
-  const out=[]; async function scan(prefix){
+  const out=[];
+  async function scan(prefix){
     const { data }=await supabase.storage.from(BUCKET).list(prefix||'',{limit:2000});
     for(const it of (data||[])){
       if(it.name==='.init') continue;
@@ -382,16 +557,24 @@ async function rebuildIndex(){
       if(it.metadata && typeof it.metadata.size==='number'){ out.push({name:it.name, full}); }
       else { await scan(full); }
     }
-  } await scan(''); acIndex = out;
+  }
+  await scan('');
+  acIndex = out;
 }
 function onTypeSearch(){ clearTimeout(acTimer); acTimer = setTimeout(showAutocomplete, 150); }
 function showAutocomplete(){
-  const term=(el('#q').value||'').trim().toLowerCase(); const box=el('#acList');
+  const term=(el('#q').value||'').trim().toLowerCase();
+  const box=el('#acList');
   if(!term){ box.style.display='none'; box.innerHTML=''; return; }
   if(!acIndex.length){ rebuildIndex().then(showAutocomplete); return; }
   const results = acIndex.filter(x=>x.full.toLowerCase().includes(term)).slice(0,12);
   if(!results.length){ box.style.display='none'; box.innerHTML=''; return; }
-  box.innerHTML = results.map(r=>`<div class='opt' onclick="acPick('${encodeURIComponent(r.full)}')">📄 <div style='min-width:0'><div>${escapeHtml(r.name)}</div><div class='path'>${escapeHtml(r.full)}</div></div></div>`).join('');
+  box.innerHTML = results.map(r=>`<div class='opt' onclick="acPick('${encodeURIComponent(r.full)}')">📄 
+      <div style='min-width:0'>
+        <div>${escapeHtml(r.name)}</div>
+        <div class='path'>${escapeHtml(r.full)}</div>
+      </div>
+    </div>`).join('');
   box.style.display='block';
 }
 function acPick(encFull){
@@ -412,7 +595,8 @@ async function buscar(){
   const hits = acIndex.filter(x=>x.full.toLowerCase().includes(term));
   const wrap=el('#view'); wrap.innerHTML='';
   const head=document.createElement('div'); head.className='list-head';
-  head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>'; wrap.appendChild(head);
+  head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
+  wrap.appendChild(head);
   for(const h of hits){
     const parts=h.full.split('/'); const folder=parts.slice(0,-1).join('/'); const name=parts.pop();
     const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
@@ -431,24 +615,5 @@ async function buscar(){
   await rebuildIndex();
 })();
 </script>
-
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
