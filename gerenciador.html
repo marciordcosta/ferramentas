@@ -82,13 +82,15 @@
 
   #view{display:block}
 
-  .list-head,.list-row{display:grid;grid-template-columns:40px 1fr 120px 140px;gap:10px;align-items:center}
+  .list-head,.list-row{display:grid;grid-template-columns:40px 1fr 120px 200px;gap:10px;align-items:center}
   .list-head{color:var(--muted);font-size:12px;margin-bottom:6px;padding:0 8px}
   .list-row{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:0px}
   .list-row .name{font-weight:600;font-size:16px}
+  .actions{display:flex;align-items:center;gap:6px}
   .actions span{cursor:pointer;padding:1px;border-radius:6px;font-size:20px}
   .actions span:hover{background:#f3f4f6}
   .actions .del{color:#b91c1c}
+  .select-file{width:18px;height:18px;cursor:pointer}
 
   /* Modal */
   .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:300}
@@ -116,6 +118,9 @@
   <button class="primary" onclick="pickFiles()"><span class="icon">upload</span> Enviar</button>
   <!-- Ícone "+" para criar pasta na pasta atual -->
   <button onclick="openCreateFolder()" title="Nova pasta"><span class="icon">add</span></button>
+  <!-- Botões em lote: aparecem apenas com seleção -->
+  <button id="btnMoveSel" style="display:none" title="Mover selecionados" onclick="openBatchMove()"><span class="icon">drive_file_move</span> Mover</button>
+  <button id="btnDeleteSel" style="display:none" title="Excluir selecionados" onclick="batchDelete()"><span class="icon">delete</span> Excluir</button>
   <input id="filePick" type="file" multiple style="display:none" />
 </div>
 
@@ -165,13 +170,16 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentPath = "";
 let uploadQueue = [];
 let selectedFile = null;
-let dlgMode = "pick"; // 'pick' upload | 'move' mover | 'create' criar pasta
+let dlgMode = "pick"; // 'pick' upload | 'move' mover | 'create' criar pasta | 'moveMany' mover vários
 let acIndex = []; let acTimer = null;
+
+/* seleção múltipla (apenas arquivos) */
+const selectedSet = new Set();
 
 const el = s => document.querySelector(s);
 const clean = p => (p||"").replace(/^\/+|\/+$/g, "");
 function fmtSize(n){if(!n)return"-";const u=["B","KB","MB","GB"];let i=0;while(n>1024&&i<u.length-1){n/=1024;i++}return n.toFixed(1)+" "+u[i]}
-function escapeHtml(s){return (s||"").replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
+function escapeHtml(s){return (s||"").replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 
 /* === AUTH === */
 async function ensureAuth(){
@@ -201,7 +209,8 @@ function setCrumbs(){
   const bc = el('#breadcrumbs'); bc.innerHTML='';
   const root=document.createElement('span'); root.textContent='Arquivos'; root.onclick=()=>gotoFolder(''); bc.appendChild(root);
   if(!currentPath) return;
-  let acc=''; currentPath.split('/').forEach(part=>{
+  let acc='';
+  currentPath.split('/').forEach(part=>{
     acc = acc? acc+'/'+part : part;
     const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›';
     const seg=document.createElement('span'); seg.textContent=part; seg.onclick=()=>gotoFolder(acc);
@@ -215,9 +224,15 @@ async function gotoFolder(prefix){ currentPath=clean(prefix||''); setCrumbs(); a
 async function render(){
   const wrap = el('#view'); wrap.innerHTML='';
   const { folders, files } = await listChildren(currentPath);
-  const head=document.createElement('div'); head.className='list-head'; head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>'; wrap.appendChild(head);
+  const head=document.createElement('div'); head.className='list-head';
+  head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
+  wrap.appendChild(head);
   folders.forEach(f=> wrap.appendChild(rowFolder(f)) );
   files.forEach(file=> wrap.appendChild(rowFile(file)) );
+
+  // limpar seleção ao renderizar uma pasta
+  selectedSet.clear();
+  updateSelectionUI();
 
   const pane = document.querySelector('aside.right');
   if(currentPath==='' && files.length===0){
@@ -252,7 +267,6 @@ function rowFolder(f){
             onclick="event.stopPropagation(); removeFolder('${f.full}')">delete</span>
     </div>
   `;
-
   return r;
 }
 
@@ -260,6 +274,10 @@ function rowFile(file){
   const r=document.createElement('div'); r.className='list-row';
   r.onclick = ()=> setPreview(file);
   const folderPath = file.full.split('/').slice(0,-1).join('/');
+
+  // checkbox de seleção múltipla (apenas arquivos)
+  const checkboxHtml = `<input type="checkbox" class="select-file" onclick="onSelectToggle(event,'${file.full}')" />`;
+
   r.innerHTML=`<div>📄</div>
     <div>
       <div class='name'>${escapeHtml(file.name)}</div>
@@ -271,8 +289,23 @@ function rowFile(file){
       <span class='icon' title='Mover' onclick="event.stopPropagation(); openFolderPicker('move','${file.full}')">drive_file_move</span>
       <span class='icon' title='Renomear' onclick="event.stopPropagation(); renameFile('${file.full}')">edit</span>
       <span class='icon del' title='Excluir' onclick="event.stopPropagation(); deleteFile('${file.full}')">delete</span>
+      ${checkboxHtml}
     </div>`;
   return r;
+}
+
+/* === SELEÇÃO MÚLTIPLA === */
+function onSelectToggle(e, full){
+  e.stopPropagation();
+  if(e.target.checked) selectedSet.add(full);
+  else selectedSet.delete(full);
+  updateSelectionUI();
+}
+
+function updateSelectionUI(){
+  const hasSel = selectedSet.size > 0;
+  el('#btnMoveSel').style.display = hasSel ? '' : 'none';
+  el('#btnDeleteSel').style.display = hasSel ? '' : 'none';
 }
 
 /* === PREVIEW === */
@@ -340,7 +373,7 @@ async function sendEmail(){
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-/* === AÇÕES ARQUIVO === */
+/* === AÇÕES ARQUIVO (INDIVIDUAL) === */
 async function downloadFile(full){
   const { data, error } = await supabase.storage.from(BUCKET).download(full);
   if(error){ alert('Falha ao baixar.'); return; }
@@ -362,7 +395,7 @@ async function renameFile(full){
   await render(); await rebuildIndex();
 }
 
-/* === AÇÕES PASTA === */
+/* === AÇÕES PASTA (INDIVIDUAL) === */
 async function renameFolder(full){
   const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/');
   const novo=prompt('Novo nome da pasta:', old);
@@ -454,7 +487,8 @@ async function selectFolderForAction(dest){
   const dlg=el('#dlg');
   const src=dlg.dataset.source||'';
   const isFolderMove = dlg.dataset.isFolderMove==='1';
-  if(dlgMode==='pick') await doUploadTo(dest);
+  if(dlgMode==='pick'){ await doUploadTo(dest); }
+  else if(dlgMode==='moveMany'){ await doBatchMoveTo(dest); }
   else{
     if(isFolderMove) await moveFolderContents(src,dest);
     else await doMoveFileTo(src,dest);
@@ -505,7 +539,6 @@ function openCreateFolder(){
   dlg.dataset.source = "";
   dlg.dataset.isFolderMove = "0";
   dlgMode = "create";
-  // Não carrega lista; foca só em criar
   el('#newFolderName').focus();
 }
 
@@ -513,12 +546,10 @@ async function criarPastaFromDlg(){
   const name=clean(el('#newFolderName').value);
   if(!name) return;
 
-  // Se veio do botão "+", criar dentro da pasta atual
   let dest;
   if (dlgMode === 'create') {
     dest = currentPath ? `${currentPath}/${name}` : name;
   } else {
-    // comportamento anterior preservado quando modal é usado por outras ações
     dest = name;
   }
 
@@ -528,6 +559,43 @@ async function criarPastaFromDlg(){
   await render();
   await rebuildIndex();
   alert('Pasta criada.');
+}
+
+/* === AÇÕES EM LOTE (APENAS ARQUIVOS) === */
+function openBatchMove(){
+  if(selectedSet.size===0) return;
+  dlgMode = 'moveMany';
+  el('#dlgTitle').textContent = 'Mover arquivos selecionados para…';
+  const dlg=el('#dlg'); dlg.style.display='flex';
+  dlg.dataset.source = '';
+  dlg.dataset.isFolderMove = '0';
+  loadDlgFolders();
+}
+
+async function doBatchMoveTo(dest){
+  const files = Array.from(selectedSet);
+  for(const from of files){
+    const name = from.split('/').pop();
+    const to = `${dest}/${name}`;
+    const { error } = await supabase.storage.from(BUCKET).move(from, to);
+    if(error){ alert('Falha ao mover algum item.'); return; }
+  }
+  selectedSet.clear();
+  await render();
+  await rebuildIndex();
+  alert('Arquivos movidos.');
+}
+
+async function batchDelete(){
+  if(selectedSet.size===0) return;
+  if(!confirm(`Excluir ${selectedSet.size} arquivo(s)?`)) return;
+  const paths = Array.from(selectedSet);
+  const { error } = await supabase.storage.from(BUCKET).remove(paths);
+  if(error){ alert('Falha ao excluir algum item.'); return; }
+  selectedSet.clear();
+  await render();
+  await rebuildIndex();
+  alert('Arquivos excluídos.');
 }
 
 /* === BUSCA + AUTOCOMPLETE === */
