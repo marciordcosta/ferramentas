@@ -257,8 +257,9 @@ async function render(){
     pane.style.visibility='visible'; pane.style.pointerEvents='auto';
   }
 
+  
   setPreview(null);
-  }
+}
 
 /* === LINHAS === */
 function rowFolder(f){
@@ -287,7 +288,8 @@ function rowFolder(f){
 }
 
 function rowFile(file){
-  const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
+  const r=document.createElement('div'); r.className='list-row';
+  r.dataset.full = file.full; r.dataset.full = file.full;
   r.onclick = ()=> setPreview(file);
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
@@ -356,7 +358,8 @@ if (file) {
 
   const lower = file.name.toLowerCase();
   if(/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) return previewImage(file.full);
-  if(/\.(pdf)$/i.test(lower)) return previewPDF(file.full);
+  if(/\.pdf$/i.test(lower)) return previewPDF(file.full);
+  if(/\.docx$/i.test(lower)) return previewDOCX(file.full);
   if (/\.docx$/i.test(lower)) return previewDOCX(file.full);
 
   box.innerHTML = `<div style='padding:14px'>
@@ -681,10 +684,11 @@ function showAutocomplete(){
 }
   
 function onEnterSearch(event){
-  if (event.key === 'Enter') {
-    el('#acList').style.display = 'none';
+  if(event.key==='Enter'){
+    el('#acList').style.display='none';
     buscar();
   }
+}
 }
 
 function acPick(encFull){
@@ -726,12 +730,15 @@ async function buscar(){
   if(!acIndex.length) await rebuildIndex();
 
   const hits = acIndex.filter(x=>x.full.toLowerCase().includes(term));
-  const wrap=el('#view'); wrap.innerHTML='';
+  const wrap=el('#view'); 
+  wrap.innerHTML='';
 
-  const head=document.createElement('div'); head.className='list-head';
+  const head=document.createElement('div'); 
+  head.className='list-head';
   head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
   wrap.appendChild(head);
 
+  const builtFiles = [];
   for(const h of hits){
     const parts=h.full.split('/');
     const folder=parts.slice(0,-1).join('/');
@@ -740,22 +747,18 @@ async function buscar(){
     const item = (data||[]).find(x=>x.name===name);
     const size = item?.metadata?.size||0;
     const file={ name, full:h.full, size };
+    builtFiles.push(file);
     wrap.appendChild(rowFile(file));
   }
 
+  if (builtFiles.length > 0){
+    setPreview(builtFiles[0]);
   }
-
-/* === BOOT === */
-(async function(){
-  await ensureAuth();
-  await gotoFolder('');
-  await rebuildIndex();
 })();
 </script>
 
 </body>
 </html>
-
 
 
 
