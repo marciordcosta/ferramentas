@@ -257,12 +257,7 @@ async function render(){
     pane.style.visibility='visible'; pane.style.pointerEvents='auto';
   }
 
-  if (hits.length === 1) {
-    const h = hits[0];
-    const file = { name: h.full.split('/').pop(), full: h.full, size: 0 };
-    setPreview(file);
- }
-}
+  }
 
 /* === LINHAS === */
 function rowFolder(f){
@@ -747,8 +742,7 @@ async function buscar(){
     wrap.appendChild(rowFile(file));
   }
 
-  setPreview(null);
-}
+  }
 
 /* === BOOT === */
 (async function(){
