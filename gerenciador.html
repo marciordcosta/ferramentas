@@ -731,6 +731,20 @@ async function buscar(){
   const head=document.createElement('div'); head.className='list-head';
   head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
   wrap.appendChild(head);
+  
+  // pré-visualizar automaticamente o primeiro resultado, se houver
+  if (hits.length > 0) {
+  const first = hits[0];
+  const parts = first.full.split('/');
+  const folder = parts.slice(0,-1).join('/');
+  const name = parts.pop();
+
+  const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
+  const item = (data||[]).find(x=>x.name === name);
+  if (item) {
+    setPreview({ name, full:first.full, size:item.metadata.size });
+  }
+}
 
   for(const h of hits){
     const parts=h.full.split('/');
@@ -756,6 +770,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
