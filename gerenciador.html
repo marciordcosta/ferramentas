@@ -62,56 +62,6 @@
   .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:12px}
   .folder-mini{display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer}
   .folder-mini:hover{background:#f3f4f6}
-
-  /* ===== MOBILE BOTTOM BAR ===== */
-  @media (max-width: 768px) {
-
-    main {
-      padding-bottom: 70px;
-      flex-direction: column;
-    }
-
-    aside.right {
-      width: 100%;
-      margin-top: 12px;
-    }
-
-    .toolbar {
-      flex-wrap: wrap;
-    }
-
-    input[type=text] {
-      min-width: 100%;
-    }
-
-    .bottom-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 58px;
-      background: #fff;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      z-index: 999;
-    }
-
-    .bottom-bar button {
-      flex-direction: column;
-      background: transparent;
-      border: none;
-      padding: 4px;
-      font-size: 12px;
-      color: var(--text);
-    }
-
-    .bottom-bar button .icon {
-      font-size: 26px;
-    }
-  }
-
 </style>
 </head>
 <body>
@@ -163,34 +113,6 @@
   </div>
 </div>
 
-<!-- BOTTOM BAR MOBILE -->
-<div class="bottom-bar">
-  <button onclick="gotoFolder('')">
-    <span class="icon">home</span>
-    Home
-  </button>
-
-  <button onclick="document.querySelector('#q').focus()">
-    <span class="icon">search</span>
-    Buscar
-  </button>
-
-  <button onclick="pickFiles()">
-    <span class="icon">upload</span>
-    Upload
-  </button>
-
-  <button onclick="goUpMobile()">
-    <span class="icon">arrow_back</span>
-    Voltar
-  </button>
-
-  <button onclick="window.scrollTo({top:0,behavior:'smooth'})">
-    <span class="icon">arrow_upward</span>
-    Topo
-  </button>
-</div>
-
 <script>
 /* === CONFIG === */
 const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
@@ -211,15 +133,7 @@ let acTimer = null;
 const el = s => document.querySelector(s);
 const clean = p => (p||"").replace(/^\/+|\/+$/g, "");
 function fmtSize(n){if(!n)return"-";const u=["B","KB","MB","GB"];let i=0;while(n>1024&&i<u.length-1){n/=1024;i++}return n.toFixed(1)+" "+u[i]}
-function escapeHtml(s){return (s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
-
-/* MOBILE: VOLTAR UMA PASTA */
-function goUpMobile(){
-  if(!currentPath) return;
-  const parts = currentPath.split('/');
-  parts.pop();
-  gotoFolder(parts.join('/'));
-}
+function escapeHtml(s){return (s||"").replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 
 /* === AUTH === */
 async function ensureAuth(){
@@ -299,7 +213,6 @@ function rowFolder(f){
             onclick="event.stopPropagation(); removeFolder('${f.full}')">delete</span>
     </div>
   `;
-
   return r;
 }
 
@@ -333,7 +246,12 @@ function setPreview(file){
   const meta = el('#previewMeta'); const box = el('#previewBox');
   const send = el('#sendArea');
 
-  if(!file){ meta.textContent='Selecione um arquivo'; box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>'; send.style.display='none'; return; }
+  if(!file){
+    meta.textContent='Selecione um arquivo';
+    box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>';
+    send.style.display='none';
+    return;
+  }
 
   meta.textContent = `${file.full} • ${fmtSize(file.size)}`;
   send.style.display='flex';
@@ -352,13 +270,17 @@ function setPreview(file){
 
 async function previewImage(path){
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
-  const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
-  const url = URL.createObjectURL(data); box.innerHTML = `<img src='${url}' alt='preview'/>`;
+  const box = el('#previewBox');
+  if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
+  const url = URL.createObjectURL(data);
+  box.innerHTML = `<img src='${url}' alt='preview'/>`;
 }
 async function previewPDF(path){
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
-  const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar PDF.</div>'; return; }
-  const url = URL.createObjectURL(data); box.innerHTML = `<iframe class='pdf' src='${url}'></iframe>`;
+  const box = el('#previewBox');
+  if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar PDF.</div>'; return; }
+  const url = URL.createObjectURL(data);
+  box.innerHTML = `<iframe class='pdf' src='${url}'></iframe>`;
 }
 
 /* === ENVIAR === */
@@ -384,7 +306,9 @@ ${url}`;
 async function downloadFile(full){
   const { data, error } = await supabase.storage.from(BUCKET).download(full);
   if(error){ alert('Falha ao baixar.'); return; }
-  const url = URL.createObjectURL(data); const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop(); a.click(); URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(data);
+  const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop();
+  a.click(); URL.revokeObjectURL(url);
 }
 async function deleteFile(full){
   if(!confirm('Excluir arquivo?')) return;
@@ -452,8 +376,9 @@ el('#filePick').addEventListener('change', e=>{
 
 function openFolderPicker(mode, sourceFull=null, isFolderMove=false){
   dlgMode=mode;
-  el('#dlgTitle').textContent = mode==='pick' ? 'Selecionar pasta de destino' :
-    (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
+  el('#dlgTitle').textContent = mode==='pick'
+    ? 'Selecionar pasta de destino'
+    : (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
   const dlg=el('#dlg');
   dlg.style.display='flex';
   dlg.dataset.source = sourceFull || '';
@@ -598,7 +523,9 @@ async function buscar(){
   head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
   wrap.appendChild(head);
   for(const h of hits){
-    const parts=h.full.split('/'); const folder=parts.slice(0,-1).join('/'); const name=parts.pop();
+    const parts=h.full.split('/');
+    const folder=parts.slice(0,-1).join('/');
+    const name=parts.pop();
     const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
     const item = (data||[]).find(x=>x.name===name);
     const size = item?.metadata?.size||0;
