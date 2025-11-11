@@ -288,7 +288,9 @@ function rowFolder(f){
 
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
-  r.onclick = ()=> setPreview(file);
+  
+  r.dataset.name = file.name;
+r.onclick = ()=> setPreview(file);
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
   // checkbox de seleção múltipla (apenas arquivos)
@@ -746,10 +748,45 @@ async function buscar(){
   }
 
 /* === BOOT === */
+
+function bindDblClickDelegation(){
+  if (window.__dblBound) return;
+  window.__dblBound = true;
+  const container = document.querySelector('#view');
+  if(!container) return;
+  container.addEventListener('dblclick', async (event)=>{
+    const row = event.target.closest('.list-row');
+    if(!row) return;
+    const full = row.dataset.full || '';
+    const name = (row.dataset.name || '');
+    const ext = name.toLowerCase();
+
+    try{
+      const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(full, 3600);
+      if (error || !data?.signedUrl) { alert('Erro ao abrir.'); return; }
+      const url = data.signedUrl;
+
+      if (ext.endsWith('.pdf')){
+        window.open(url, '_blank');
+        return;
+      }
+      if (ext.endsWith('.docx')){
+        window.location.href = url;
+        return;
+      }
+    }catch(e){
+      console.error(e);
+      alert('Falha ao abrir.');
+    }
+  });
+}
+
 (async function(){
   await ensureAuth();
   await gotoFolder('');
   await rebuildIndex();
+
+  bindDblClickDelegation();
 })();
 </script>
 
