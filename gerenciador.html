@@ -292,20 +292,53 @@ function rowFile(file){
   r.ondblclick = async (event) => {
   event.stopPropagation();
 
-  // gerar URL temporária do supabase
   const { data, error } = await supabase
-      .storage
-      .from(BUCKET)
-      .createSignedUrl(file.full, 3600);
+    .storage
+    .from(BUCKET)
+    .createSignedUrl(file.full, 3600);
 
   if (error || !data?.signedUrl) {
     alert('Erro ao abrir o arquivo.');
     return;
   }
 
-  // abrir em nova aba
-  window.open(data.signedUrl, '_blank');
+  const url = data.signedUrl;
+  const ext = file.name.toLowerCase();
+
+  // se for DOCX → abrir visualizador customizado
+  if (ext.endsWith('.docx')) {
+    const win = window.open('', '_blank');
+
+    win.document.write(`
+      <html>
+      <head>
+        <meta charset="utf-8"/>
+        <title>${file.name}</title>
+        <script src="https://unpkg.com/docx-preview/dist/docx-preview.js"></script>
+      </head>
+      <body style="margin:0;padding:0;overflow:auto">
+        <div id="viewer" style="padding:20px;"></div>
+        <script>
+          fetch("${url}")
+            .then(r => r.blob())
+            .then(blob => {
+              docx.renderAsync(blob, document.getElementById("viewer"))
+                .catch(()=> {
+                  document.body.innerHTML = "<h2>Erro ao renderizar DOCX</h2>";
+                });
+            });
+        </script>
+      </body>
+      </html>
+    `);
+
+    return;
+  }
+
+  // demais formatos → abre direto
+  window.open(url, "_blank");
 };
+
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
   // checkbox de seleção múltipla (apenas arquivos)
@@ -772,6 +805,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
