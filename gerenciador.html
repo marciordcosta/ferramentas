@@ -333,6 +333,7 @@ function setPreview(file){
   const lower = file.name.toLowerCase();
   if(/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) return previewImage(file.full);
   if(/\.(pdf)$/i.test(lower)) return previewPDF(file.full);
+  if (/\.docx$/i.test(lower)) return previewDOCX(file.full);
 
   box.innerHTML = `<div style='padding:14px'>
     <div style='font-size:40px;margin-bottom:8px'>📄</div>
@@ -703,4 +704,5 @@ async function buscar(){
 
 </body>
 </html>
+
 
