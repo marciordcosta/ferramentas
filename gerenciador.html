@@ -112,6 +112,12 @@
   width: max-content !important;
 }
 
+
+/* --- Ajustes adicionados --- */
+#previewBox{ overflow-x:auto !important; }
+#previewBox .docx-wrapper{ margin:0 !important; max-width:none !important; width:max-content !important; }
+#previewBox .docx-wrapper section.docx{ padding-left:0 !important; margin-left:0 !important; }
+.list-row.selected{ border-color:#2563eb !important; background:#eef4ff !important; }
 </style>
 <script src="https://unpkg.com/jszip/dist/jszip.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/docx-preview/dist/docx-preview.css" />
@@ -287,7 +293,8 @@ function rowFolder(f){
 }
 
 function rowFile(file){
-  const r=document.createElement('div'); r.className='list-row'; r.dataset.full = file.full;
+  const r=document.createElement('div'); r.className='list-row';
+  r.dataset.full = file.full; r.dataset.full = file.full;
   r.onclick = ()=> setPreview(file);
   const folderPath = file.full.split('/').slice(0,-1).join('/');
 
@@ -332,7 +339,14 @@ async function getSignedUrl(path){
 
 function setPreview(file){
   selectedFile = file;
-  // remove destaque anterior
+  
+  // Destaque da linha selecionada
+  document.querySelectorAll('.list-row.selected').forEach(el=>el.classList.remove('selected'));
+  if(file){
+    const row = document.querySelector(`.list-row[data-full="${'${file.full}'}"]`);
+    if(row) row.classList.add('selected');
+  }
+// remove destaque anterior
 document.querySelectorAll('.list-row.selected').forEach(el => {
   el.classList.remove('selected');
 });
@@ -356,7 +370,8 @@ if (file) {
 
   const lower = file.name.toLowerCase();
   if(/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) return previewImage(file.full);
-  if(/\.(pdf)$/i.test(lower)) return previewPDF(file.full);
+  if(/\.pdf$/i.test(lower)) return previewPDF(file.full);
+  if(/\.docx$/i.test(lower)) return previewDOCX(file.full);
   if (/\.docx$/i.test(lower)) return previewDOCX(file.full);
 
   box.innerHTML = `<div style='padding:14px'>
@@ -688,18 +703,31 @@ function onEnterSearch(event){
 }
 
 function acPick(encFull){
-  const full = decodeURIComponent(encFull);
+  const full=decodeURIComponent(encFull);
   const fileName = full.split('/').pop();
   const folder = full.split('/').slice(0,-1).join('/');
 
   el('#q').value = fileName;
-  el('#acList').style.display = 'none';
+  el('#acList').style.display='none';
 
-  // Vai para a pasta normalmente
-  gotoFolder(folder).then(async () => {
-
-    // Após entrar na pasta, filtramos APENAS dentro da pasta
+  gotoFolder(folder).then(async()=>{
     const { files } = await listChildren(folder);
+    const match = files.find(f=>f.full===full);
+
+    // redesenha a lista com apenas o arquivo selecionado
+    const wrap = el('#view'); 
+    wrap.innerHTML='';
+    const head=document.createElement('div'); 
+    head.className='list-head';
+    head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
+    wrap.appendChild(head);
+
+    if(match){
+      wrap.appendChild(rowFile(match));
+      setPreview(match);
+    }
+  });
+} = await listChildren(folder);
     const match = files.find(f => f.full === full);
 
     // Limpa a lista atual
@@ -734,21 +762,27 @@ async function buscar(){
   head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
   wrap.appendChild(head);
 
-  if (hits.length > 0) {
+  // Auto-preview: se 1 resultado, navega para pasta e pré-visualiza; se >1, pré-visualiza o primeiro sem navegar
+  if (hits.length === 1) {
     const first = hits[0];
     const parts = first.full.split('/');
-    const folder = parts.slice(0, -1).join('/');
+    const folder = parts.slice(0,-1).join('/');
+    const name = parts.pop();
+
+    await gotoFolder(folder);
+    const { files } = await listChildren(folder);
+    const match = files.find(f => f.full === first.full);
+    if (match) setPreview(match);
+  } else if (hits.length > 1) {
+    const first = hits[0];
+    const parts = first.full.split('/');
+    const folder = parts.slice(0,-1).join('/');
     const name = parts.pop();
 
     const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
     const item = (data || []).find(x => x.name === name);
-
     if (item) {
-      setPreview({
-        name,
-        full: first.full,
-        size: item.metadata?.size || 0
-      });
+      setPreview({ name, full:first.full, size:item.metadata?.size || 0 });
     }
   }
 
