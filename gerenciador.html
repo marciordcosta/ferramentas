@@ -13,12 +13,37 @@
     --danger:#dc2626; --shadow:0 10px 24px rgba(0,0,0,.06);
   }
   body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Arial,sans-serif;font-size: 14px;}
-  header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+
+  /* HEADER FIXO */
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 18px;
+    background:#fff;
+    border-bottom:1px solid var(--border);
+    position:sticky;
+    top:0;
+    z-index:100;
+  }
+
   .brand{font-weight:700;font-size:18px;display:flex;align-items:center;gap:12px}
   .brand a{color:var(--primary);text-decoration:none;font-weight:600;font-size: 16px}
   .user a{color:var(--danger);cursor:pointer;text-decoration:none;margin-left:10px}
 
-  .toolbar{display:flex;gap:10px;padding:14px;background:#fff;border-bottom:1px solid var(--border);align-items:center}
+  /* TOOLBAR FIXA */
+  .toolbar{
+    display:flex;
+    gap:10px;
+    padding:14px;
+    background:#fff;
+    border-bottom:1px solid var(--border);
+    align-items:center;
+    position:sticky;
+    top:54px;
+    z-index:99;
+  }
+
   .crumbs span{cursor:pointer;color:var(--primary)}
   .crumbs .sep{color:var(--muted)}
 
@@ -26,19 +51,28 @@
   button{cursor:pointer;border:1px solid var(--border);border-radius:10px;background:#e7e1e1;padding:6px 12px;display:flex;align-items:center;gap:4px}
   button.primary{background:var(--primary);border-color:var(--primary);color:#fff}
   button.primary:hover{background:var(--primary-2)}
-
   .icon{font-family:"Material Symbols Rounded";font-size:20px;vertical-align:middle}
 
-  /* Autocomplete */
+  /* AUTOCOMPLETE */
   .ac-wrap{position:relative}
-  #acList{position:absolute;background:#fff;border:1px solid var(--border);border-radius:10px;width:100%;max-height:260px;overflow-y:auto;display:none;z-index:50;box-shadow:var(--shadow)}
+  #acList{position:absolute;background:#fff;border:1px solid var(--border);border-radius:10px;width:100%;max-height:260px;overflow-y:auto;display:none;z-index:200;box-shadow:var(--shadow)}
   #acList .opt{padding:8px 10px;cursor:pointer;font-size:14px;display:flex;gap:8px;align-items:center}
   #acList .opt:hover{background:#eef2ff}
   #acList .path{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  main{display:flex;gap:16px;padding:16px}
+  main{display:flex;gap:16px;padding:16px;margin-top:10px}
+
   .left{flex:1}
-  .right{width:520px;margin-top:20px}
+
+  /* PRÉ-VISUALIZAÇÃO FIXA */
+  .right{
+    width:520px;
+    margin-top:20px;
+    position:sticky;
+    top:110px;
+    height:calc(100vh - 130px);
+    overflow-y:auto;
+  }
 
   .preview{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
   .preview .title{font-weight:700;margin-bottom:10px;font-size:17px}
@@ -47,6 +81,7 @@
   .preview img{max-width:100%;display:block}
 
   #view{display:block}
+
   .list-head,.list-row{display:grid;grid-template-columns:40px 1fr 120px 140px;gap:10px;align-items:center}
   .list-head{color:var(--muted);font-size:12px;margin-bottom:6px;padding:0 8px}
   .list-row{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:0px}
@@ -55,8 +90,8 @@
   .actions span:hover{background:#f3f4f6}
   .actions .del{color:#b91c1c}
 
-  /* Modal pastas */
-  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:60}
+  /* Modal */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:300}
   .modal{width:700px;max-width:95vw;background:#fff;border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow)}
   .modal header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
   .folders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:12px}
@@ -65,6 +100,7 @@
 </style>
 </head>
 <body>
+
 <header>
   <div class="brand">Gerenciador <a href="index.html">· Voltar</a></div>
   <div class="user"><span id="userEmail"></span><a onclick="logout()">sair</a></div>
@@ -85,6 +121,7 @@
   <div class="left">
     <div id="view"></div>
   </div>
+
   <aside class="right">
     <div class="preview">
       <div class="title">Pré-visualização</div>
@@ -126,7 +163,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentPath = "";
 let uploadQueue = [];
 let selectedFile = null;
-let dlgMode = "pick"; // 'pick' upload | 'move' mover
+let dlgMode = "pick";
 let acIndex = []; let acTimer = null;
 
 const el = s => document.querySelector(s);
@@ -162,7 +199,12 @@ function setCrumbs(){
   const bc = el('#breadcrumbs'); bc.innerHTML='';
   const root=document.createElement('span'); root.textContent='Arquivos'; root.onclick=()=>gotoFolder(''); bc.appendChild(root);
   if(!currentPath) return;
-  let acc=''; currentPath.split('/').forEach(part=>{ acc = acc? acc+'/'+part : part; const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›'; const seg=document.createElement('span'); seg.textContent=part; seg.onclick=()=>gotoFolder(acc); bc.appendChild(sep); bc.appendChild(seg); });
+  let acc=''; currentPath.split('/').forEach(part=>{
+    acc = acc? acc+'/'+part : part;
+    const sep=document.createElement('span'); sep.className='sep'; sep.textContent='›';
+    const seg=document.createElement('span'); seg.textContent=part; seg.onclick=()=>gotoFolder(acc);
+    bc.appendChild(sep); bc.appendChild(seg);
+  });
 }
 
 /* === RENDER === */
@@ -175,10 +217,12 @@ async function render(){
   folders.forEach(f=> wrap.appendChild(rowFolder(f)) );
   files.forEach(file=> wrap.appendChild(rowFile(file)) );
 
-  // Pré-visualização: escondida na raiz (só pastas)
   const pane = document.querySelector('aside.right');
-  if(currentPath==='' && files.length===0){ pane.style.visibility='hidden'; pane.style.pointerEvents='none'; }
-  else { pane.style.visibility='visible'; pane.style.pointerEvents='auto'; }
+  if(currentPath==='' && files.length===0){
+    pane.style.visibility='hidden'; pane.style.pointerEvents='none';
+  } else {
+    pane.style.visibility='visible'; pane.style.pointerEvents='auto';
+  }
 
   setPreview(null);
 }
@@ -209,7 +253,7 @@ function rowFolder(f){
 
   return r;
 }
-  
+
 function rowFile(file){
   const r=document.createElement('div'); r.className='list-row';
   r.onclick = ()=> setPreview(file);
@@ -237,10 +281,14 @@ async function getSignedUrl(path){
 
 function setPreview(file){
   selectedFile = file;
-  const meta = el('#previewMeta'); const box = el('#previewBox');
-  const send = el('#sendArea');
+  const meta = el('#previewMeta'); const box = el('#previewBox'); const send = el('#sendArea');
 
-  if(!file){ meta.textContent='Selecione um arquivo'; box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>'; send.style.display='none'; return; }
+  if(!file){
+    meta.textContent='Selecione um arquivo';
+    box.innerHTML='<div style="padding:14px">Nenhum arquivo.</div>';
+    send.style.display='none';
+    return;
+  }
 
   meta.textContent = `${file.full} • ${fmtSize(file.size)}`;
   send.style.display='flex';
@@ -259,43 +307,111 @@ function setPreview(file){
 
 async function previewImage(path){
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
-  const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
-  const url = URL.createObjectURL(data); box.innerHTML = `<img src='${url}' alt='preview'/>`;
+  const box = el('#previewBox');
+  if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar imagem.</div>'; return; }
+  const url = URL.createObjectURL(data);
+  box.innerHTML = `<img src='${url}' alt='preview'/>`;
 }
+
 async function previewPDF(path){
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
-  const box = el('#previewBox'); if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar PDF.</div>'; return; }
-  const url = URL.createObjectURL(data); box.innerHTML = `<iframe class='pdf' src='${url}'></iframe>`;
+  const box = el('#previewBox');
+  if(error){ box.innerHTML='<div style="padding:14px">Falha ao carregar PDF.</div>'; return; }
+  const url = URL.createObjectURL(data);
+  box.innerHTML = `<iframe class='pdf' src='${url}'></iframe>`;
 }
 
 /* === ENVIAR === */
-async function sendWhatsApp(){ if(!selectedFile) return; const url = await getSignedUrl(selectedFile.full); if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; } const text = `Segue o arquivo: ${selectedFile.full}
-${url}`; window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank'); }
-async function sendEmail(){ if(!selectedFile) return; const url = await getSignedUrl(selectedFile.full); if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; } const subject = 'Envio de arquivo'; const body = `Segue o arquivo: ${selectedFile.full}
-${url}`; window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }
+async function sendWhatsApp(){
+  if(!selectedFile) return;
+  const url = await getSignedUrl(selectedFile.full);
+  if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; }
+  const text = `Segue o arquivo: ${selectedFile.full}\n${url}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
+}
+async function sendEmail(){
+  if(!selectedFile) return;
+  const url = await getSignedUrl(selectedFile.full);
+  if(!url){ alert('Não foi possível gerar link de compartilhamento.'); return; }
+  const subject = 'Envio de arquivo';
+  const body = `Segue o arquivo: ${selectedFile.full}\n${url}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 
 /* === AÇÕES ARQUIVO === */
 async function downloadFile(full){
   const { data, error } = await supabase.storage.from(BUCKET).download(full);
   if(error){ alert('Falha ao baixar.'); return; }
-  const url = URL.createObjectURL(data); const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop(); a.click(); URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(data);
+  const a=document.createElement('a'); a.href=url; a.download=full.split('/').pop(); a.click(); URL.revokeObjectURL(url);
 }
-async function deleteFile(full){ if(!confirm('Excluir arquivo?')) return; const { error } = await supabase.storage.from(BUCKET).remove([full]); if(error){ alert('Falha ao excluir.'); return; } await render(); await rebuildIndex(); }
-async function renameFile(full){ const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/'); const novo=prompt('Novo nome do arquivo:', old); if(!novo||novo===old) return; const { error } = await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`); if(error){ alert('Falha ao renomear.'); return; } await render(); await rebuildIndex(); }
+async function deleteFile(full){
+  if(!confirm('Excluir arquivo?')) return;
+  const { error } = await supabase.storage.from(BUCKET).remove([full]);
+  if(error){ alert('Falha ao excluir.'); return; }
+  await render(); await rebuildIndex();
+}
+async function renameFile(full){
+  const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/');
+  const novo=prompt('Novo nome do arquivo:', old);
+  if(!novo||novo===old) return;
+  const { error } = await supabase.storage.from(BUCKET).move(full, `${parent?parent+'/':''}${novo}`);
+  if(error){ alert('Falha ao renomear.'); return; }
+  await render(); await rebuildIndex();
+}
 
 /* === AÇÕES PASTA === */
-async function renameFolder(full){ const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/'); const novo=prompt('Novo nome da pasta:', old); if(!novo||novo===old) return; const items=await listAllUnder(full); await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), {upsert:true}); for(const p of items){ const rest=p.slice(full.length+1); await supabase.storage.from(BUCKET).move(p, `${parent?parent+'/':''}${novo}/${rest}`); } await supabase.storage.from(BUCKET).remove([`${full}/.init`]).catch(()=>{}); await render(); await rebuildIndex(); }
-async function removeFolder(full){ if(!confirm(`Excluir a pasta e todo o conteúdo?
-${full}`)) return; const items=await listAllUnder(full); if(items.length===0) items.push(`${full}/.init`); const { error } = await supabase.storage.from(BUCKET).remove(items); if(error){ alert('Falha ao excluir pasta.'); return; } await render(); await rebuildIndex(); }
-async function listAllUnder(prefix){ const out=[], q=[prefix]; while(q.length){ const p=q.shift(); const { data }=await supabase.storage.from(BUCKET).list(p,{limit:2000}); for(const it of (data||[])){ if(it.name==='.init') continue; const full=clean(`${p}/${it.name}`); if(it.metadata && typeof it.metadata.size==='number') out.push(full); else q.push(full); } } return out; }
+async function renameFolder(full){
+  const parts=full.split('/'); const old=parts.pop(); const parent=parts.join('/');
+  const novo=prompt('Novo nome da pasta:', old);
+  if(!novo||novo===old) return;
+  const items=await listAllUnder(full);
+  await supabase.storage.from(BUCKET).upload(`${parent?parent+'/':''}${novo}/.init`, new Blob(['']), {upsert:true});
+  for(const p of items){
+    const rest=p.slice(full.length+1);
+    await supabase.storage.from(BUCKET).move(p, `${parent?parent+'/':''}${novo}/${rest}`);
+  }
+  await supabase.storage.from(BUCKET).remove([`${full}/.init`]).catch(()=>{});
+  await render(); await rebuildIndex();
+}
+async function removeFolder(full){
+  if(!confirm(`Excluir a pasta e todo o conteúdo?\n${full}`)) return;
+  const items=await listAllUnder(full);
+  if(items.length===0) items.push(`${full}/.init`);
+  const { error } = await supabase.storage.from(BUCKET).remove(items);
+  if(error){ alert('Falha ao excluir pasta.'); return; }
+  await render(); await rebuildIndex();
+}
+async function listAllUnder(prefix){
+  const out=[], q=[prefix];
+  while(q.length){
+    const p=q.shift();
+    const { data }=await supabase.storage.from(BUCKET).list(p,{limit:2000});
+    for(const it of (data||[])){
+      if(it.name==='.init') continue;
+      const full=clean(`${p}/${it.name}`);
+      if(it.metadata && typeof it.metadata.size==='number') out.push(full);
+      else q.push(full);
+    }
+  }
+  return out;
+}
 
 /* === UPLOAD / MOVER (MODAL) === */
 function pickFiles(){ el('#filePick').click(); }
-el('#filePick').addEventListener('change', e=>{ uploadQueue = Array.from(e.target.files||[]); openFolderPicker('pick'); });
+el('#filePick').addEventListener('change', e=>{
+  uploadQueue = Array.from(e.target.files||[]);
+  openFolderPicker('pick');
+});
 
 function openFolderPicker(mode, sourceFull=null, isFolderMove=false){
-  dlgMode=mode; el('#dlgTitle').textContent = mode==='pick' ? 'Selecionar pasta de destino' : (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
-  const dlg=el('#dlg'); dlg.style.display='flex'; dlg.dataset.source = sourceFull || ''; dlg.dataset.isFolderMove = isFolderMove ? '1':'0';
+  dlgMode=mode;
+  el('#dlgTitle').textContent = mode==='pick'
+    ? 'Selecionar pasta de destino'
+    : (isFolderMove ? 'Mover conteúdo da pasta…' : 'Mover arquivo para…');
+  const dlg=el('#dlg'); dlg.style.display='flex';
+  dlg.dataset.source = sourceFull || '';
+  dlg.dataset.isFolderMove = isFolderMove ? '1':'0';
   loadDlgFolders();
 }
 function hideDlg(){ el('#dlg').style.display='none'; }
@@ -306,28 +422,41 @@ async function loadDlgFolders(){
   const folders=await listAllFolders();
   folders.forEach(f=>{
     const d=document.createElement('div'); d.className='folder-mini';
-    d.innerHTML=`<div>📁</div><div style='flex:1;min-width:0'>${escapeHtml(f)}</div><div style='display:flex;gap:6px'><span class='icon' onclick="renameFolder('${f}')">edit</span><span class='icon del' onclick="removeFolder('${f}')">delete</span></div>`;
+    d.innerHTML=`<div>📁</div><div style='flex:1;min-width:0'>${escapeHtml(f)}</div>
+    <div style='display:flex;gap:6px'>
+      <span class='icon' onclick="renameFolder('${f}')">edit</span>
+      <span class='icon del' onclick="removeFolder('${f}')">delete</span>
+    </div>`;
     d.ondblclick=()=> selectFolderForAction(f);
     grid.appendChild(d);
   });
 }
 async function listAllFolders(){
-  const out=[]; async function scan(prefix){
+  const out=[];
+  async function scan(prefix){
     const { data }=await supabase.storage.from(BUCKET).list(prefix||'',{limit:2000,sortBy:{column:'name',order:'asc'}});
     for(const it of (data||[])){
       if(it.name==='.init') continue;
       if(!(it.metadata && typeof it.metadata.size==='number')){
         const full=clean(prefix?`${prefix}/${it.name}`:it.name);
-        out.push(full); await scan(full);
+        out.push(full);
+        await scan(full);
       }
     }
-  } await scan(''); return out;
+  }
+  await scan('');
+  return out;
 }
 
 async function selectFolderForAction(dest){
-  const dlg=el('#dlg'); const src=dlg.dataset.source||''; const isFolderMove = dlg.dataset.isFolderMove==='1';
-  if(dlgMode==='pick'){ await doUploadTo(dest); }
-  else { if(isFolderMove) await moveFolderContents(src,dest); else await doMoveFileTo(src,dest); }
+  const dlg=el('#dlg');
+  const src=dlg.dataset.source||'';
+  const isFolderMove = dlg.dataset.isFolderMove==='1';
+  if(dlgMode==='pick') await doUploadTo(dest);
+  else{
+    if(isFolderMove) await moveFolderContents(src,dest);
+    else await doMoveFileTo(src,dest);
+  }
   hideDlg();
 }
 async function doUploadTo(dest){
@@ -374,26 +503,43 @@ async function criarPastaFromDlg(){
 
 /* === BUSCA + AUTOCOMPLETE === */
 async function rebuildIndex(){
-  const out=[]; async function scan(prefix){
+  const out=[];
+  async function scan(prefix){
     const { data }=await supabase.storage.from(BUCKET).list(prefix||'',{limit:2000});
     for(const it of (data||[])){
       if(it.name==='.init') continue;
       const full=clean(prefix?`${prefix}/${it.name}`:it.name);
       if(it.metadata && typeof it.metadata.size==='number'){ out.push({name:it.name, full}); }
-      else { await scan(full); }
+      else await scan(full);
     }
-  } await scan(''); acIndex = out;
+  }
+  await scan('');
+  acIndex = out;
 }
-function onTypeSearch(){ clearTimeout(acTimer); acTimer = setTimeout(showAutocomplete, 150); }
+
+function onTypeSearch(){
+  clearTimeout(acTimer);
+  acTimer = setTimeout(showAutocomplete, 150);
+}
+
 function showAutocomplete(){
-  const term=(el('#q').value||'').trim().toLowerCase(); const box=el('#acList');
+  const term=(el('#q').value||'').trim().toLowerCase();
+  const box=el('#acList');
   if(!term){ box.style.display='none'; box.innerHTML=''; return; }
   if(!acIndex.length){ rebuildIndex().then(showAutocomplete); return; }
+
   const results = acIndex.filter(x=>x.full.toLowerCase().includes(term)).slice(0,12);
   if(!results.length){ box.style.display='none'; box.innerHTML=''; return; }
-  box.innerHTML = results.map(r=>`<div class='opt' onclick="acPick('${encodeURIComponent(r.full)}')">📄 <div style='min-width:0'><div>${escapeHtml(r.name)}</div><div class='path'>${escapeHtml(r.full)}</div></div></div>`).join('');
+
+  box.innerHTML = results.map(r=>`<div class='opt' onclick="acPick('${encodeURIComponent(r.full)}')">📄 
+    <div style='min-width:0'>
+      <div>${escapeHtml(r.name)}</div>
+      <div class='path'>${escapeHtml(r.full)}</div>
+    </div></div>`).join('');
+
   box.style.display='block';
 }
+
 function acPick(encFull){
   const full=decodeURIComponent(encFull);
   const folder = full.split('/').slice(0,-1).join('/');
@@ -405,22 +551,30 @@ function acPick(encFull){
     if(match) setPreview(match);
   });
 }
+
 async function buscar(){
   const term=(el('#q').value||'').trim().toLowerCase();
   if(!term){ alert('Digite algo para buscar.'); return; }
   if(!acIndex.length) await rebuildIndex();
+
   const hits = acIndex.filter(x=>x.full.toLowerCase().includes(term));
   const wrap=el('#view'); wrap.innerHTML='';
+
   const head=document.createElement('div'); head.className='list-head';
-  head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>'; wrap.appendChild(head);
+  head.innerHTML='<div></div><div>Nome</div><div>Tamanho</div><div>Ações</div>';
+  wrap.appendChild(head);
+
   for(const h of hits){
-    const parts=h.full.split('/'); const folder=parts.slice(0,-1).join('/'); const name=parts.pop();
+    const parts=h.full.split('/');
+    const folder=parts.slice(0,-1).join('/');
+    const name=parts.pop();
     const { data } = await supabase.storage.from(BUCKET).list(folder,{limit:2000});
     const item = (data||[]).find(x=>x.name===name);
     const size = item?.metadata?.size||0;
     const file={ name, full:h.full, size };
     wrap.appendChild(rowFile(file));
   }
+
   setPreview(null);
 }
 
@@ -434,21 +588,3 @@ async function buscar(){
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
