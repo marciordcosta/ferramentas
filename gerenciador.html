@@ -127,7 +127,7 @@
 <div class="toolbar">
   <div id="breadcrumbs" class="crumbs"></div>
   <div class="ac-wrap" style="flex:1;max-width:360px">
-    <input id="q" type="text" placeholder="Pesquisar (auto-complete)" oninput="onTypeSearch()" onkeydown="if(event.key==='Enter')buscar()"/>
+    <input id="q" type="text" placeholder="Pesquisar (auto-complete)" oninput="onTypeSearch()" onkeydown="onEnterSearch(event)"/>
     <div id="acList"></div>
   </div>
   
@@ -679,6 +679,12 @@ function showAutocomplete(){
 
   box.style.display='block';
 }
+  
+function onEnterSearch(event){
+if (event.key === 'Enter') {
+  el('#acList').style.display = 'none';
+ }
+}
 
 function acPick(encFull){
   const full = decodeURIComponent(encFull);
@@ -749,6 +755,7 @@ async function buscar(){
 
 </body>
 </html>
+
 
 
 
