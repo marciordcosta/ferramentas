@@ -546,11 +546,12 @@
       "taxaColeta": 25.00,
       "freteMinimo": 140.00,
       "prazos": {
-        "Araruna": 96
+        "Araruna": 120
       }
     }
   ]
 };
+
 
 
 
