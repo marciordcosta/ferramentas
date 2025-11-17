@@ -254,7 +254,6 @@
         "Jucas": 24,
         "Lavras da Mangabeira": 24,
         "Limoeiro do Norte": 24,
-        "Maranhão": 96,
         "Mauriti": 24,
         "Milagres": 24,
         "Missão Velha": 24,
@@ -269,7 +268,6 @@
         "Pacajus": 24,
         "Pacatuba": 24,
         "Palhano": 24,
-        "Paraiba": 96,
         "Parambu": 24,
         "Penaforte": 24,
         "Pereiro": 72,
@@ -554,6 +552,7 @@
     }
   ]
 };
+
 
 
 
