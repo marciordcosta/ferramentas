@@ -539,19 +539,19 @@
     },
 
     {
-      "nome": "Transportadora D",
-      "valorPorKg": 4.8,
-      "valorPorNF": 9.0,
-      "taxaColeta": 3.0,
-      "freteMinimo": 50.00,
+      "nome": "Ceará Transportes",
+      "uf": "PB",
+      "valorPorKg": 0.85,
+      "valorPorNF": 0.005,
+      "taxaColeta": 25.00,
+      "freteMinimo": 140.00,
       "prazos": {
-        "Fortaleza": 24,
-        "Maracanau": 24,
-        "Caucaia": 24
+        "Araruna": 96
       }
     }
   ]
 };
+
 
 
 
