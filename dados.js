@@ -546,11 +546,13 @@
       "taxaColeta": 25.00,
       "freteMinimo": 140.00,
       "prazos": {
-        "Araruna": 120
+        "Araruna": 120,
+        "Santa Helena": 120
       }
     }
   ]
 };
+
 
 
 
