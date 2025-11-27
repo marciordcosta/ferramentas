@@ -547,12 +547,14 @@
       "freteMinimo": 140.00,
       "prazos": {
         "Araruna": 120,
+        "Areia": 120,
         "Santa Helena": 120,
         "Joao Pessoa": 120
       }
     }
   ]
 };
+
 
 
 
