@@ -102,6 +102,7 @@ button {
 
   <label>Selecione o banco/chave</label>
   <select id="banco">
+   <option value="vendas@cearasementes.com.br" data-nome="Stone">Stone</option> 
    <option value="05541695000132" data-nome="Banco do Brasil">Banco do Brasil PJ</option>
    <option value="48426245315" data-nome="Banco do Brasil">Banco do Brasil (Ivan)</option>
    <option value="34471704000164" data-nome="Agro Cearense">Agro Cearense</option>
@@ -137,6 +138,7 @@ const CURRENCY = '986';
 const COUNTRY = 'BR';
 let codigoGerado = "";
 const BENEFICIARIOS = {
+  "vendas@cearasementes.com.br": "Francisco Ivan Costa Flores",
   "05541695000132": "Francisco Ivan Costa Flores",
   "48426245315": "Francisco Ivan Costa",
   "34471704000164": "Larissa Firmino da Costa ME"
@@ -286,6 +288,7 @@ async function baixarPDF() {
 </script>
 </body>
 </html>
+
 
 
 
