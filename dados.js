@@ -549,11 +549,14 @@
         "Araruna": 120,
         "Areia": 120,
         "Santa Helena": 120,
-        "Joao Pessoa": 120
+        "Joao Pessoa": 120,
+        "Pombal": 120,
+        "Patos": 120
       }
     }
   ]
 };
+
 
 
 
