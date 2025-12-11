@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Conciliação</title>
+
+  <style>
+   
+body { 
+  font-family: Arial, sans-serif; 
+  margin: 20px; 
+  background: #f5f5f5;
+}
+
+/* ===========================
+   PAINEL PRINCIPAL (uploads + filtros)
+=========================== */
+.painel-horizontal {
+  display: flex;
+  gap: 25px;
+  padding: 18px;
+  border: 1px solid #d0d0d0;
+  border-radius: 10px;
+  background: #ffffff;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* UPLOADS */
+.col-upload {
+  width: 350px;
+  border-right: 1px solid #e0e0e0;
+  padding-right: 18px;
+}
+
+.col-upload label {
+  font-size: 14px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.col-upload input[type="file"] {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+/* FILTROS */
+.col-filtros {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+  min-width: 360px;
+}
+
+.titulo-filtro {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ccc;
+  width: 100%;
+}
+
+.fLinha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fLinha label {
+  min-width: 90px;
+  font-size: 14px;
+}
+
+.linha-filtros-botoes {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 10px !important;
+    align-items: center !important;
+}
+.btnCinza {
+    background: #c1ed9c !important;
+}
+
+
+.col-filtros select,
+.col-filtros input[type="date"] {
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.col-upload button,
+.btnFiltro {
+  margin-top: 8px;
+  width: 90px;
+  padding: 3px;
+  font-size: 13px;
+  color: #131313;
+  cursor: pointer;
+  border-radius: 10px;
+  border: none;
+  background: #ececec;
+}
+
+/* novos botões topo */
+.topo-acoes {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+/* ===========================
+   LISTAGEM / PAINÉIS LADO A LADO
+=========================== */
+.container { 
+  display: flex; 
+  gap: 20px;
+  margin-top: 10px;
+}
+
+#btnConciliar {
+  display: none !important;
+}
+
+.panel {
+  flex: 1;
+  border: 1px solid #ccc;
+  padding: 5px 20px;
+  height: 500px;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.title {
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ccc;
+}
+
+/* bloco de duas datas */
+.bloco-datas {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.linha-data {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.linha-data-fim {
+    margin-top: -2px;
+}
+
+/* coluna dos botões Exportar / Salvar */
+.col-acoes-superior {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: end;
+    justify-content: flex-start;
+}
+
+/* botões topo */
+.btn-acao-topo {
+    padding: 5px 10px;
+    border-radius: 2px;
+    color: white;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.btn-acao-topo.azul {
+    background: #4aa3ff;
+}
+
+.btn-acao-topo.verde {
+    background: #28a745;
+}
+
+.btn-acao-topo.vermelho {
+    background: #ff2a12;
+}
+
+.lista-arquivos-importados {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #444;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    border-bottom: 1px solid #ddd;
+}
+
+.arquivo-tag {
+    color: #444;
+    font-weight: bold;
+}
+
+.arquivo-tag span {
+    cursor: pointer;
+    margin-left: 6px;
+    color: red;
+    font-weight: bold;
+}
+
+.arquivos-superiores {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin: 10px 0;
+    padding: 8px 5px;
+}
+
+.arquivos-coluna {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.arquivos-coluna .arquivo-tag {
+    color: #444;
+}
+
+.arquivos-coluna .arquivo-tag span {
+    cursor: pointer;
+    margin-left: 4px;
+    color: red;
+    font-weight: bold;
+}
+
+.painel-arquivos {
+    display: flex;
+    justify-content: space-between;
+}
+
+.arquivos-coluna {
+    width: 48%;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.arquivos-coluna.left { 
+    text-align: left;
+}
+
+.arquivos-coluna.right { 
+    text-align: right;
+}
+
+
+/* ===========================
+   ITENS DE LISTA
+=========================== */
+.item {
+  padding: 6px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.item:hover { background: #f3f3f3; }
+.selected { background: #cce5ff !important; }
+.conciliated { background: #d4edda !important; }
+
+
+button { 
+  padding: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #b7b7b7;
+  background: #51a5fb;
+  color: #fff;
+}
+
+.fullscreen-mode {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #fff;
+  padding: 10px;
+  margin: 0 !important;
+  z-index: 99999;
+  overflow: auto;
+}
+
+.hide-on-fullscreen {
+  display: none !important;
+}
+
+#fullscreenConciliarBtn {
+  display: none;
+  position: fixed;
+  top: 75px;
+  right: 10px;
+  padding: 5px 10px;
+  font-size: 14px;
+  border-radius: 10px;
+  background: #5fc2ff;
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 100000;
+}
+
+#expandToggle {
+  position: fixed;
+  top: 20px;
+  right: 30px;
+  font-size: 30px;
+  cursor: pointer;
+  z-index: 99999;
+  padding: 4px 6px;
+}
+
+#expandToggle.fullscreen-icon {
+  position: fixed;
+  top: 0px;
+  right: 10px;
+  font-size: 22px;
+  z-index: 100001;
+}
+
+.searchbox {
+  width: 300px;
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #333;
+}
+
+.searchbox::placeholder {
+  color: #999;
+}
+
+/* FIXAR CABEÇALHO DOS PAINÉIS */
+.fixed-header {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 5000;
+  padding-top: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ccc;
+}
+
+/* ===========================
+   RODAPÉ / PAINEL DIFERENÇA
+=========================== */
+#painelDiferenca {
+  top: 30px;
+  right: 75px;        /* posição inicial */
+  left: auto;         
+  padding: 10px 15px;
+  background: #d4f8d4;
+  border-radius: 5px;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 999999;
+  cursor: grab;
+  min-width: 180px;
+  display: inline-block;   /* evita esticar */
+}
+
+#painelDiferenca:active {
+  cursor: grabbing;
+}
+
+.float-diff:active {
+  cursor: grabbing;
+}
+
+
+#totaisRodape {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #fafafa;
+  border-top: 1px solid #ccc;
+  padding: 8px 12px;
+  font-size: 14px;
+  display: flex;
+  gap: 40px;
+  z-index: 9999;
+}
+
+  </style>
+</head>
+
+<body>
+
+<div id="painelDiferenca">Diferença: R$ 0,00</div>
+
+<!-- ====== UPLOADS ====== -->
+<div class="painel-horizontal">
+
+  <!-- COLUNA 1 — UPLOADS -->
+  <div class="col-upload">
+    <label>Arquivos OFX:</label>
+    <input type="file" id="ofxFiles" accept=".ofx" multiple><br><br>
+
+    <label>Relatórios HTML (Sistema):</label>
+    <input type="file" id="htmlFile" accept=".html,.htm" multiple><br><br>
+
+    <button id="processBtn">Carregar</button>
+  </div>
+
+  <!-- COLUNA 2 — FILTROS -->
+  <div class="col-filtros">
+
+    <label class="titulo-filtro">Filtros</label>
+
+    <div class="fLinha">
+      <label>Banco:</label>
+      <select id="filterBanco">
+        <option value="">Todos</option>
+        <option value="001">Banco do Brasil</option>
+        <option value="197">Stone</option>
+      </select>
+    </div>
+
+    <div class="fLinha bloco-datas">
+    <div class="linha-data">
+        <label>Data início:</label>
+        <input type="date" id="filterDataInicio">
+    </div>
+
+    <div class="linha-data linha-data-fim">
+        <label>Data fim:</label>
+        <input type="date" id="filterDataFim">
+    </div>
+</div>
+
+<div class="fLinha">
+    <label>Forma Pagto:</label>
+    <select id="filterTipo">
+        <option value="">Todos</option>
+        <option value="PIX">PIX</option>
+        <option value="CARTAO">Cartão</option>
+        <option value="BOLETO">Boleto</option>
+        <option value="OUTRO">Outro</option>
+    </select>
+</div>
+
+<div class="fLinha">
+    <label>Tipo Relatório:</label>
+    <select id="filterKind">
+        <option value="">Todos</option>
+        <option value="receber">Entrada</option>
+        <option value="pagar">Saída</option>
+    </select>
+</div>
+
+<!-- CORREÇÃO: botões dentro do container de botões -->
+<div class="linha-filtros-botoes">
+  <button id="aplicarFiltros" class="btnFiltro">Filtrar</button>
+  <button id="limparFiltros" class="btnFiltro btnCinza">Limpar</button>
+</div>
+
+</div>
+
+<!-- COLUNA 3 — BOTÕES (EXPORTAR / SALVAR) -->
+<div class="col-acoes-superior">
+
+    <button id="btnExportarTopo" class="btn-acao-topo azul">
+        Exportar CSV
+    </button>
+
+    <button id="btnSalvarTopo" class="btn-acao-topo verde">
+        Salvar
+    </button>
+
+    <button id="btnLimparTopo" class="btn-acao-topo vermelho">
+      Limpar dados
+    </button>
+
+</div>
+
+
+</div>
+
+<div id="expandToggle" title="Expandir/Restaurar">⛶</div>
+
+<!-- LISTA DE ARQUIVOS IMPORTADOS -->
+<div class="painel-arquivos">
+    <div class="arquivos-coluna" id="arquivosOFX"></div>
+    <div class="arquivos-coluna" id="arquivosSYS"></div>
+</div>
+
+
+<!-- ====== PAINÉIS PRINCIPAIS ====== -->
+<div class="container">
+
+    <!-- LEFT: OFX -->
+    <div class="panel" id="panelBanco">
+      <div class="title fixed-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Banco (OFX)</span>
+        <input id="searchBanco" type="text" placeholder="pesquisa…" class="searchbox">
+      </div>
+      <div id="listaBanco"></div>
+    </div>
+
+    <!-- RIGHT: SISTEMA -->
+    <div class="panel" id="panelSistema">
+      <div class="title fixed-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Sistema (HTML)</span>
+        <input id="searchSistema" type="text" placeholder="pesquisa…" class="searchbox">
+      </div>
+      <div id="listaSistema"></div>
+    </div>
+
+</div>
+
+<div id="totaisRodape">
+  <div><b>OFX:</b> Registros: <span id="t_ofx_regs">0</span> |
+      Entradas: <span id="t_ofx_in">0</span> |
+      Saídas: <span id="t_ofx_out">0</span></div>
+
+  <div><b>Sistema:</b> Registros: <span id="t_sys_regs">0</span> |
+      Entradas: <span id="t_sys_in">0</span> |
+      Saídas: <span id="t_sys_out">0</span></div>
+</div>
+
+<!-- ====== AÇÕES / RODAPÉ REMOVIDOS (antes havia #footerActions) ====== -->
+
+
+<script src="js/conciliacao.js"></script>
+
+<button id="fullscreenConciliarBtn">Conciliar</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  const toggle = document.getElementById("expandToggle");
+  const container = document.querySelector(".container");
+  const middleBtn = document.getElementById("btnConciliar");
+  const fullBtn = document.getElementById("fullscreenConciliarBtn");
+
+  let isFull = false;
+
+  toggle.addEventListener("click", () => {
+    isFull = !isFull;
+
+    if (isFull) {
+
+      container.classList.add("fullscreen-mode");
+      toggle.classList.add("fullscreen-icon");
+
+      document.querySelectorAll(".title")
+        .forEach(t => t.classList.add("fixed-header"));
+
+      middleBtn.style.display = "none";
+      fullBtn.style.display = "block";
+
+    } else {
+
+      container.classList.remove("fullscreen-mode");
+      toggle.classList.remove("fullscreen-icon");
+
+      document.querySelectorAll(".title")
+        .forEach(t => t.classList.add("fixed-header"));
+
+      middleBtn.style.display = "block";
+      fullBtn.style.display = "none";
+    }
+  });
+
+  fullBtn.addEventListener("click", () => {
+    document.getElementById("btnConciliar").click();
+  });
+
+});
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const el = document.getElementById("painelDiferenca");
+  if (!el) return;
+
+  // garante estilo base
+  el.style.position = "fixed";
+  el.style.boxSizing = "border-box";
+  el.style.minWidth = el.style.minWidth || "140px";
+
+  // converte RIGHT -> LEFT uma única vez (se não convertido)
+  const rect = el.getBoundingClientRect();
+  if (!el.style.left || el.style.left === "" || el.style.left === "auto") {
+    el.style.left  = Math.max(8, Math.round(rect.left)) + "px";
+    el.style.top   = Math.max(8, Math.round(rect.top)) + "px";
+    el.style.right = "auto";
+  }
+
+  let dragging = false;
+  let startX = 0, startY = 0;
+  let origUserSelect = "";
+
+  function getClientX(e) { return (e.touches ? e.touches[0].clientX : e.clientX); }
+  function getClientY(e) { return (e.touches ? e.touches[0].clientY : e.clientY); }
+
+  function onStart(e) {
+    e.preventDefault();
+    dragging = true;
+
+    // garante valores numéricos para left/top
+    const curLeft = parseFloat(el.style.left) || el.getBoundingClientRect().left;
+    const curTop  = parseFloat(el.style.top)  || el.getBoundingClientRect().top;
+
+    startX = getClientX(e) - curLeft;
+    startY = getClientY(e) - curTop;
+
+    // visual
+    el.style.cursor = "grabbing";
+    el.style.zIndex = 1000000;
+
+    // bloqueia seleção de texto durante o drag
+    origUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    const x = Math.round(getClientX(e) - startX);
+    const y = Math.round(getClientY(e) - startY);
+
+    // limites simples para não sair totalmente da tela
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const elW = el.offsetWidth;
+    const elH = el.offsetHeight;
+
+    const clampX = Math.min(Math.max(8, x), Math.max(8, winW - elW - 8));
+    const clampY = Math.min(Math.max(8, y), Math.max(8, winH - elH - 8));
+
+    el.style.left = clampX + "px";
+    el.style.top  = clampY + "px";
+  }
+
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    el.style.cursor = "grab";
+    document.body.style.userSelect = origUserSelect || "";
+  }
+
+  // mouse
+  el.addEventListener("mousedown", onStart);
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onEnd);
+
+  // touch
+  el.addEventListener("touchstart", onStart, {passive:false});
+  document.addEventListener("touchmove", onMove, {passive:false});
+  document.addEventListener("touchend", onEnd);
+
+  // reforça posição após redimensionamento da janela
+  window.addEventListener("resize", () => {
+    const l = parseFloat(el.style.left) || el.getBoundingClientRect().left;
+    const t = parseFloat(el.style.top)  || el.getBoundingClientRect().top;
+    const winW = window.innerWidth, winH = window.innerHeight;
+    const elW = el.offsetWidth, elH = el.offsetHeight;
+    el.style.left = Math.min(Math.max(8, l), Math.max(8, winW - elW - 8)) + "px";
+    el.style.top  = Math.min(Math.max(8, t), Math.max(8, winH - elH - 8)) + "px";
+  });
+});
+</script>
+
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+const { createClient } = window.supabase;
+
+const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// e-mail autorizado
+const EMAIL_PERMITIDO = "cearasementes@gmail.com";
+
+// executado quando a página abre
+async function verificarLogin() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+
+    // não está logado → volta para a página de login
+    if (!session) {
+        window.location.href = "index.html"; // altere se seu login estiver em outro arquivo
+        return;
+    }
+
+    const email = session.user.email;
+
+    // logado, mas não autorizado
+    if (email !== EMAIL_PERMITIDO) {
+        alert("Acesso negado.");
+        await supabase.auth.signOut();
+        window.location.href = "index.html";
+        return;
+    }
+
+    // autorizado → liberar a página
+    console.log("Acesso autorizado:", email);
+}
+
+verificarLogin();
+</script>
+
+
+</body>
+</html>
