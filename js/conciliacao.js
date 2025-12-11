@@ -1,7 +1,5 @@
 // ------------------------------------------------------------
 // conciliacao.organizado.js
-// Versão reorganizada e com duplicidades consolidadas (sem alterar lógica)
-// Mantive duplicidade do menu de contexto (OPÇÃO A)
 // ------------------------------------------------------------
 
 // Estado global
@@ -1249,3 +1247,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
