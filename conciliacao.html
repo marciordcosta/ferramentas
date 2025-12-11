@@ -43,6 +43,7 @@ body {
 .col-upload input[type="file"] {
   margin-bottom: 12px;
   font-size: 13px;
+  color: #a3a3a3;
 }
 
 /* FILTROS */
@@ -50,13 +51,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-top: 4px;
   min-width: 360px;
 }
 
 .titulo-filtro {
   font-size: 15px;
   font-weight: bold;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid #ccc;
   width: 100%;
@@ -130,7 +132,8 @@ body {
   flex: 1;
   border: 1px solid #ccc;
   padding: 5px 20px;
-  height: 500px;
+  max-height: calc(100vh - 70px);
+  height: auto;
   overflow-y: auto;
   background: #ffffff;
   border-radius: 6px;
@@ -264,6 +267,11 @@ body {
     text-align: right;
 }
 
+.desativado {
+    opacity: 0.35 !important;
+    filter: grayscale(100%) !important;
+}
+
 
 /* ===========================
    ITENS DE LISTA
@@ -297,7 +305,7 @@ button {
   top: 0;
   left: 0;
   width: 100vw !important;
-  height: 100vh !important;
+  height: auto;
   background: #fff;
   padding: 10px;
   margin: 0 !important;
@@ -398,12 +406,12 @@ button {
   bottom: 0;
   left: 0;
   width: 100%;
-  background: #fafafa;
+  background: #e7e7e7;
   border-top: 1px solid #ccc;
   padding: 8px 12px;
   font-size: 14px;
   display: flex;
-  gap: 40px;
+  gap: 100px;
   z-index: 9999;
 }
 
@@ -412,18 +420,19 @@ button {
 
 <body>
 
- <a href="index.html" style="
+  <a href="index.html" style="
     position: absolute;
-    top: -5px;
+    top: 0;
     right: 25px;
     font-size: 14px;
-    color: #ff0000;
+    color: #555;
     text-decoration: none;
     padding: 6px 10px;
     border-radius: 6px;
 ">
     ← voltar
-</a> 
+</a>
+
 
 <div id="painelDiferenca">Diferença: R$ 0,00</div>
 
@@ -548,16 +557,51 @@ button {
 </div>
 
 <div id="totaisRodape">
-  <div><b>OFX:</b> Registros: <span id="t_ofx_regs">0</span> |
-      Entradas: <span id="t_ofx_in">0</span> |
-      Saídas: <span id="t_ofx_out">0</span></div>
+    
+  <div>
+    <b>OFX:</b>
+    Registros: <span id="t_ofx_regs">0</span> |
+    Entradas: <span id="t_ofx_in">0</span> |
+    Saídas: <span id="t_ofx_out">0</span> |
+    <b>Saldo:</b> <span id="t_ofx_saldo">0,00</span>
+  </div>
 
-  <div><b>Sistema:</b> Registros: <span id="t_sys_regs">0</span> |
-      Entradas: <span id="t_sys_in">0</span> |
-      Saídas: <span id="t_sys_out">0</span></div>
+  <div>
+    <b>Sistema:</b>
+    Registros: <span id="t_sys_regs">0</span> |
+    Entradas: <span id="t_sys_in">0</span> |
+    Saídas: <span id="t_sys_out">0</span> |
+    <b>Saldo:</b> <span id="t_sys_saldo">0,00</span>
+  </div>
+
 </div>
 
-<!-- ====== AÇÕES / RODAPÉ REMOVIDOS (antes havia #footerActions) ====== -->
+
+<div id="ctxMenu" style="
+    position:absolute;
+    display:none;
+    background:#ffffff;
+    border:1px solid #ccc;
+    padding:5px 0;
+    border-radius:4px;
+    z-index:999999;
+    font-size:14px;
+    min-width:150px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+">
+  <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; user-select:none;">
+    Desativar
+  </div>
+
+  <div id="ctxConcManual" style="
+      padding:8px 12px; 
+      cursor:pointer; 
+      user-select:none;
+      border-top:1px solid #eee;
+  ">
+    Conciliar manual (Sistema → OFX)
+  </div>
+</div>
 
 
 <script src="js/conciliacao.js"></script>
@@ -743,12 +787,5 @@ async function verificarLogin() {
 verificarLogin();
 </script>
 
-
 </body>
 </html>
-
-
-
-
-
-
