@@ -1,6 +1,7 @@
 // ------------------------------------------------------------
 // conciliacao.organizado.js
 // Versão reorganizada e com duplicidades consolidadas (sem alterar lógica)
+// Mantive duplicidade do menu de contexto (OPÇÃO A)
 // ------------------------------------------------------------
 
 // Estado global
@@ -30,6 +31,19 @@ function formatMoney(n) {
   if (n == null || n === "") return "R$ 0.00";
   return "R$ " + Number(n).toFixed(2);
 }
+
+function formatarContabil(n) {
+    if (n == null || isNaN(n)) return "0,00";
+
+    const v = Number(n).toFixed(2);     // 1234.56
+    const partes = v.split(".");        // ["1234","56"]
+    const inteiro = partes[0];          
+    const decimal = partes[1];
+
+    const inteiroFormatado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return inteiroFormatado + "," + decimal;
+}
+
 
 function safeIdForHtml(s) {
   return String(s || "").replace(/"/g, '&quot;').replace(/'/g, "\\'");
@@ -165,7 +179,7 @@ function getCategoriaSistema(tipo) {
 
   if (s.includes("pix") || s.includes("dep") || s.includes("transfer") || s.includes("ted") || s.includes("doc"))
     return "PIX";
-  if (s.includes("cartao") || s.includes("cred") || s.includes("debito"))
+  if (s.includes("carto") || s.includes("crd") || s.includes("dbi"))
     return "CARTAO";
   if (s.includes("boleto"))
     return "BOLETO";
@@ -243,7 +257,8 @@ function parseOFX(text, filename) {
       amount: amt,
       desc,
       payment_type,
-      conciliado: false
+      conciliado: false,
+      desativado: false
     });
   }
 
@@ -364,7 +379,8 @@ function parseMatricial(html, filename) {
         nf,
         vendedor,
         tipo,
-        conciliado: false
+        conciliado: false,
+        desativado: false
       });
     }
   });
@@ -450,6 +466,8 @@ function calcTotals(list, isSistema = false) {
   const totals = { count: 0, entradas: 0, saidas: 0 };
 
   list.forEach(it => {
+    if (it.desativado) return; 
+
     totals.count++;
     const v = Number(isSistema ? (it.valor || 0) : (it.amount || 0));
     if (v >= 0) totals.entradas += v;
@@ -466,41 +484,74 @@ function atualizarTotais() {
   const tSys = calcTotals(sistemaFiltered, true);
 
   document.getElementById('t_ofx_regs').textContent = tOfx.count;
-  document.getElementById('t_ofx_in').textContent = tOfx.entradas.toFixed(2);
-  document.getElementById('t_ofx_out').textContent = tOfx.saidas.toFixed(2);
+  document.getElementById('t_ofx_in').textContent = formatarContabil(tOfx.entradas);
+  document.getElementById('t_ofx_out').textContent = formatarContabil(Math.abs(tOfx.saidas));
 
+  const saldoOfx = tOfx.entradas + tOfx.saidas;
+  document.getElementById('t_ofx_saldo').textContent = formatarContabil(saldoOfx);
+  const elOfxSaldo = document.getElementById("t_ofx_saldo");
+  elOfxSaldo.style.color = saldoOfx > 0 ? "green" :
+                          saldoOfx < 0 ? "red" : "#333";
+
+
+  // SISTEMA
   document.getElementById('t_sys_regs').textContent = tSys.count;
-  document.getElementById('t_sys_in').textContent = tSys.entradas.toFixed(2);
-  document.getElementById('t_sys_out').textContent = tSys.saidas.toFixed(2);
+  document.getElementById('t_sys_in').textContent = formatarContabil(tSys.entradas);
+  document.getElementById('t_sys_out').textContent = formatarContabil(Math.abs(tSys.saidas));
+
+  const saldoSys = tSys.entradas + tSys.saidas;
+  document.getElementById('t_sys_saldo').textContent = formatarContabil(saldoSys);
+  const elSysSaldo = document.getElementById("t_sys_saldo");
+  elSysSaldo.style.color = saldoSys > 0 ? "green" :
+                          saldoSys < 0 ? "red" : "#333";
+
 }
 
 // ------------------------------------------------------------
 // CONCILIAÇÃO / CANCELAR
 // ------------------------------------------------------------
 function cancelarConciliacao(chave) {
-  if (!chave) return;
+    if (!chave) return;
 
-  banco.forEach(b => {
-    if (b.parChave === chave) {
-      b.conciliado = false;
-      delete b.parChave;
-      delete b.nf;
-      delete b.cliente;
-      delete b.doc;
-      delete b.tipo;
-      delete b.dataSistema;
+    // remover conciliação dos itens de banco e coletar FAKEs para excluir
+    let idsFakeParaRemover = [];
+
+    banco.forEach(b => {
+        if (b.parChave === chave) {
+
+            // se for item manual FAKE_, marcar para exclusão
+            if (String(b.id).startsWith("FAKE_")) {
+                idsFakeParaRemover.push(b.id);
+            }
+
+            b.conciliado = false;
+            delete b.parChave;
+            delete b.nf;
+            delete b.cliente;
+            delete b.doc;
+            delete b.tipo;
+            delete b.dataSistema;
+        }
+    });
+
+    // remover os FAKEs do array banco
+    if (idsFakeParaRemover.length > 0) {
+        banco = banco.filter(b => !idsFakeParaRemover.includes(b.id));
     }
-  });
 
-  sistema.forEach(s => {
-    if (s.parChave === chave) {
-      s.conciliado = false;
-      delete s.parChave;
-    }
-  });
+    // remover conciliação do sistema
+    sistema.forEach(s => {
+        if (s.parChave === chave) {
+            s.conciliado = false;
+            delete s.parChave;
+        }
+    });
 
-  renderList();
+    renderList();
+    atualizarTotais();
 }
+
+
 window.cancelarConciliacao = cancelarConciliacao;
 
 // ------------------------------------------------------------
@@ -521,11 +572,11 @@ function atualizarPainelDiferenca() {
   const p = ensurePainelDiferenca();
 
   const somaBanco = banco
-    .filter(x => selectedBanco.has(x.id))
+    .filter(x => selectedBanco.has(x.id) && !x.desativado)
     .reduce((t,x)=>t + (Number(x.amount)||0), 0);
 
   const somaSistema = sistema
-    .filter(x => selectedSistema.has(x.id))
+    .filter(x => selectedSistema.has(x.id) && !x.desativado)
     .reduce((t,x)=>t + (Number(x.valor)||0), 0);
 
   const dif = somaBanco - somaSistema;
@@ -576,6 +627,109 @@ function atualizarPainelDiferenca() {
 }
 
 // ------------------------------------------------------------
+// DESATIVAR / REATIVAR REGISTRO
+// ------------------------------------------------------------
+function toggleDesativado(item) {
+    item.desativado = !item.desativado;   // alterna estado
+
+    // remove seleções para evitar inconsistências
+    selectedBanco.delete(item.id);
+    selectedSistema.delete(item.id);
+
+    renderList();
+    atualizarTotais();
+}
+
+// ------------------------------------------------------------
+// CONCILIAR MANUAL (apenas Sistema -> cria OFX falso)
+// ------------------------------------------------------------
+function conciliarManualSistema(itemSistema) {
+    if (!itemSistema) return;
+
+    // impedir duplicações múltiplas
+    if (itemSistema.conciliado) {
+        alert("Este item já está conciliado.");
+        return;
+    }
+
+    // chave única igual às conciliações normais
+    const chave = gerarChave();
+
+    // cria OFX falso com os mesmos dados do sistema
+    const fake = {
+    id: "FAKE_" + gerarChave(),
+    ofxFileName: "MANUAL",
+    bank: "999",
+    bankName: "Manual",
+    date: itemSistema.data || "1900-01-01",
+    amount: Number(itemSistema.valor || 0),
+
+    // descrição combinada
+    desc: `${itemSistema.cliente || ''} — ${itemSistema.tipo || ''} — ${itemSistema.doc || ''}`.trim(),
+
+    // categoria usando lógica do OFX
+    payment_type: getCategoriaOfx(itemSistema.tipo || itemSistema.cliente || ""),
+
+    conciliado: true,
+    desativado: false,
+    parChave: chave,
+
+    nf: itemSistema.nf || "",
+    cliente: itemSistema.cliente || "",
+    tipo: itemSistema.tipo || "",
+    doc: itemSistema.doc || "",
+    dataSistema: itemSistema.data || ""
+};
+
+
+    // marcar o item do sistema como conciliado
+    itemSistema.conciliado = true;
+    itemSistema.parChave = chave;
+
+    // joga o item manual no array de banco
+    banco.push(fake);
+
+    // re-renderizar
+    renderList();
+    atualizarTotais();
+}
+
+window.conciliarManualSistema = conciliarManualSistema;
+
+// controle do menu de contexto
+let ctxTarget = null;
+const ctxMenu = document.getElementById("ctxMenu");
+const ctxToggle = document.getElementById("ctxToggle");
+
+// fechar menu ao clicar fora
+document.addEventListener("click", () => {
+    ctxMenu.style.display = "none";
+});
+
+// ação do botão no menu de contexto
+ctxToggle.addEventListener("click", () => {
+    if (!ctxTarget) return;
+
+    toggleDesativado(ctxTarget);
+    ctxMenu.style.display = "none";
+});
+
+// ação do botão "Conciliar manual"
+document.getElementById("ctxConcManual").addEventListener("click", () => {
+    if (!ctxTarget) return;
+
+    // só permite conciliar manual itens do sistema
+    if (sistema.includes(ctxTarget)) {
+        conciliarManualSistema(ctxTarget);
+    } else {
+        alert("Conciliação manual só pode ser usada em registros do Sistema.");
+    }
+
+    ctxMenu.style.display = "none";
+});
+
+
+// ------------------------------------------------------------
 // RENDERIZAÇÃO PRINCIPAL (BANCO / SISTEMA)
 // ------------------------------------------------------------
 function renderList() {
@@ -618,6 +772,7 @@ function renderList() {
 
     if (item.conciliado) div.classList.add("conciliated");
     if (selectedBanco.has(item.id)) div.classList.add("selected");
+    if (item.desativado) div.classList.add("desativado");
 
     const xBtn = item.conciliado 
       ? `<span style="position:absolute; top:6px; right:6px; cursor:pointer;color:red;font-weight:bold;"
@@ -659,6 +814,18 @@ function renderList() {
             ${(item.bankName || item.ofxFileName || '---').toUpperCase()}
           </span>
 
+            ${String(item.id).startsWith("FAKE_") ? `
+            <span style="
+              padding:2px 6px;
+              font-size:11px;
+              border-radius:6px;
+              background:#ffcc00;
+              color:#000;
+              font-weight:bold;
+            ">
+              MANUAL
+            </span>` : ``}
+
         </div>
 
         <div style="font-size:12px;color:#333;">
@@ -683,6 +850,36 @@ function renderList() {
       renderList();
     });
 
+    div.addEventListener("dblclick", ev => {
+      if (ev.target.tagName === "SPAN") return;
+      toggleDesativado(item);
+    });
+
+    div.addEventListener("contextmenu", ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    ctxTarget = item;
+
+    // monta menu simples (apenas ativar / desativar)
+    ctxMenu.innerHTML = `
+        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">
+            ${item.desativado ? "Reativar" : "Desativar"}
+        </div>
+    `;
+
+    ctxMenu.style.left = ev.pageX + "px";
+    ctxMenu.style.top  = ev.pageY + "px";
+    ctxMenu.style.display = "block";
+
+    // evento
+    document.getElementById("ctxToggle").onclick = () => {
+        toggleDesativado(item);
+        ctxMenu.style.display = "none";
+    };
+});
+
+
     lb?.appendChild(div);
   });
 
@@ -692,6 +889,7 @@ function renderList() {
 
     if (item.conciliado) div.classList.add("conciliated");
     if (selectedSistema.has(item.id)) div.classList.add("selected");
+    if (item.desativado) div.classList.add("desativado");
 
     const xBtn = item.conciliado 
       ? `<span style="position:absolute; top:6px; right:6px; cursor:pointer;color:red;font-weight:bold;"
@@ -766,6 +964,42 @@ function renderList() {
       renderList();
     });
 
+    div.addEventListener("dblclick", ev => {
+      if (ev.target.tagName === "SPAN") return;
+      toggleDesativado(item);
+    });
+
+    // menu do banco
+    div.addEventListener("contextmenu", ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    ctxTarget = item;
+
+    // SE FOR SISTEMA → menu com 2 opções
+    ctxMenu.innerHTML = `
+        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">${item.desativado ? "Reativar" : "Desativar"}</div>
+        <div id="ctxManual" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+            Conciliar manual (Sistema → OFX)
+        </div>
+    `;
+
+    ctxMenu.style.left = ev.pageX + "px";
+    ctxMenu.style.top = ev.pageY + "px";
+    ctxMenu.style.display = "block";
+
+    document.getElementById("ctxToggle").onclick = () => {
+        toggleDesativado(item);
+        ctxMenu.style.display = "none";
+    };
+
+    document.getElementById("ctxManual").onclick = () => {
+        conciliarManualSistema(item);
+        ctxMenu.style.display = "none";
+    };
+});
+
+
     ls?.appendChild(div);
   });
 
@@ -777,10 +1011,29 @@ function renderList() {
 // CONCILIAR MANUAL
 // ------------------------------------------------------------
 function conciliar() {
+
+  // bloquear conciliação de itens desativados
+  for (const id of selectedBanco) {
+      const b = banco.find(x => x.id === id);
+      if (b?.desativado) {
+          alert("Há itens desativados selecionados no banco.");
+          return;
+      }
+  }
+
+  for (const id of selectedSistema) {
+      const s = sistema.find(x => x.id === id);
+      if (s?.desativado) {
+          alert("Há itens desativados selecionados no sistema.");
+          return;
+      }
+  }
+
   if (selectedBanco.size === 0 || selectedSistema.size === 0) {
     alert("Selecione pelo menos 1 item do banco e 1 do sistema.");
     return;
   }
+
 
   const chave = gerarChave();
 
@@ -996,5 +1249,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
-
-
