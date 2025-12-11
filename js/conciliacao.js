@@ -310,31 +310,26 @@ function parseMatricial(html, filename) {
 
   const fname = String(filename || "").toLowerCase();
 
-  // normaliza
+  // normaliza texto do arquivo e do HTML
   const normalizedHTML = removerAcentos(html.toLowerCase());
-  const normalizedFile = removerAcentos(fname.toLowerCase());
+  const normalizedFile = removerAcentos(fname);
 
+  // função de busca parcial
   function match(k) {
       return normalizedHTML.includes(k) || normalizedFile.includes(k);
   }
 
-  // qualquer variação de saída
+  // DETECÇÃO AUTOMÁTICA DE SAÍDA
   const isPagar =
-      match("paga") ||   // pagamento, pagar, pagas, pagto, pagando, pagou
-      match("saida") ||  // saida, saídas, saidas
-      match("desp") ||   // despesa, despesas
-      match("deb")  ||   // debito, débito, debitado
-      match("retir");    // retirada, retirar, retirado
+      match("paga") ||      // pagamento, pagar, pagas, pagou, pagto
+      match("saida") ||     // saida, saídas, saidas
+      match("desp") ||      // despesa, despesas
+      match("deb")  ||      // debito, débito, debitado
+      match("retir");       // retirada, retirar, retirado
 
-  // rótulo correto
-  const fileKindLabel = isPagar ? 'Saída' : 'Entrada';
-
-
-  // testa arquivo pelo nome OU conteúdo HTML
-  const isPagar =
-    saidaKeywords.some(k => lowerFile.includes(k)) ||
-    saidaKeywords.some(k => html.toLowerCase().includes(k));
-
+  // rótulo final
+  const fileKindLabel = isPagar ? "Saída" : "Entrada";
+  
 
   Object.keys(linhas).sort((a,b)=>a-b).forEach((top, idx) => {
     const cols = linhas[top];
@@ -1001,4 +996,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
