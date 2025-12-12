@@ -73,6 +73,182 @@ function removerAcentos(str) {
     .replace(/[^a-zA-Z0-9\s]/g, "");
 }
 
+function buscarSugestoes(itemBanco) {
+
+  // FILTRO POR TIPO
+  const tipoBanco = (itemBanco.payment_type || "").toUpperCase();
+
+  const sistemaFiltradoPorTipo = sistema.filter(s => {
+    const tipoSys = getCategoriaSistema(s.tipo || "").toUpperCase();
+    return tipoSys === tipoBanco;
+  });
+
+  const tipoOfx = (itemBanco.payment_type || "").toUpperCase();
+  const descOfx = removerAcentos(String(itemBanco.desc || "").toLowerCase());
+  const valorOfxAbs = Math.abs(Number(itemBanco.amount || 0));
+  const dataOfx = itemBanco.date || null;
+
+  const resp = {
+    mesmoValor: [],
+    mesmaData: [],
+    mesmoNome: [],
+    combinacaoCartao: []
+  };
+
+  // ------------------------------
+  // CASO: NÃO É CARTÃO
+  // ------------------------------
+  if (tipoOfx !== "CARTAO") {
+
+    // 1) MESMO VALOR (exato, qualquer data)
+    resp.mesmoValor = sistemaFiltradoPorTipo.filter(s => {
+      const v = Math.abs(Number(s.valor || 0));
+      return v === valorOfxAbs;
+    });
+
+    // 2) MESMA DATA + valor exato ou aproximado
+    if (dataOfx) {
+      resp.mesmaData = sistemaFiltradoPorTipo.filter(s => {
+        if (s.data !== dataOfx) return false;
+
+        const v = Math.abs(Number(s.valor || 0));
+        const diff = Math.abs(v - valorOfxAbs);
+
+        return diff <= valorOfxAbs * 0.05; // até 5%
+      });
+    }
+
+    // 3) MESMO NOME (busca por palavras do desc OFX dentro do cliente do sistema)
+    resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
+      const cli = removerAcentos(String(s.cliente || "").toLowerCase());
+      if (!cli) return false;
+
+      // comparação simples contendo substring
+      return cli.includes(descOfx.slice(0, 5)); // compara primeiros 5 caracteres normalizados
+    });
+
+    return resp;
+  }
+
+  // ------------------------------
+  // CASO: É CARTÃO
+  // ------------------------------
+  if (!dataOfx) return resp;
+
+  // Busca registros de até 7 dias
+  const tsOfx = new Date(dataOfx).getTime();
+
+  const itensDia = sistemaFiltradoPorTipo.filter(s => {
+    if (!s.data) return false;
+
+    const tsS = new Date(s.data).getTime();
+    const diffDias = Math.abs(tsS - tsOfx) / (1000 * 60 * 60 * 24);
+
+    return diffDias <= 7;  // intervalo de 7 dias
+  });
+
+
+  const lista = itensDia.map(s => ({
+    ref: s,
+    valorAbs: Math.abs(Number(s.valor || 0))
+  }));
+
+  // ordenar por valor desc para ajudar a combinação
+  lista.sort((a, b) => b.valorAbs - a.valorAbs);
+
+  // backtracking limitado para não travar o navegador
+  function backtrack(i, soma, caminho) {
+    if (Math.abs(soma - valorOfxAbs) <= valorOfxAbs * 0.05) {
+      return caminho;
+    }
+    if (i >= lista.length || soma > valorOfxAbs * 1.10) {
+      return null;
+    }
+
+    // incluir
+    const com = backtrack(
+      i + 1,
+      soma + lista[i].valorAbs,
+      [...caminho, lista[i].ref]
+    );
+    if (com) return com;
+
+    // não incluir
+    return backtrack(i + 1, soma, caminho);
+  }
+
+  const resultado = backtrack(0, 0, []);
+
+  if (resultado) {
+    resp.combinacaoCartao = resultado;
+  }
+
+  return resp;
+}
+
+function buscarSugestoesMultiplosBanco(itensBanco) {
+  const somaTotal = itensBanco.reduce(
+    (t, b) => t + Math.abs(Number(b.amount || 0)),
+    0
+  );
+
+  const candidatos = sistema.filter(s => {
+    const v = Math.abs(Number(s.valor || 0));
+    return v === somaTotal;
+  });
+
+  return {
+    mesmoValor: candidatos,
+    mesmaData: [],
+    mesmoNome: [],
+    combinacaoCartao: []
+  };
+}
+
+
+function mostrarPopupSugestoes(res) {
+  const popup = document.getElementById("popupSugestoes");
+  const body = document.getElementById("popupSugestoesBody");
+
+  function bloco(titulo, lista) {
+    if (!lista || lista.length === 0) return "";
+
+    return `
+      <div style="margin-top:8px;">
+        <b>${titulo} (${lista.length})</b>
+        <ul style="margin:6px 0 0 16px; padding:0;">
+          ${lista.map(s => `
+            <li style="margin-bottom:6px;">
+              <b>Data:</b> ${formatDateBR(s.data)}<br>
+              <b>Valor:</b> R$ ${Math.abs(Number(s.valor || 0)).toFixed(2)}<br>
+              <b>Cliente:</b> ${s.cliente || "---"}<br>
+              <b>DOC:</b> ${s.doc || "---"} — <b>NF:</b> ${s.nf || "---"}
+            </li>
+          `).join("")}
+        </ul>
+      </div>
+    `;
+  }
+
+  let html = "";
+
+  html += bloco("Mesmo Valor", res.mesmoValor);
+  html += bloco("Mesma Data (valor aproximado)", res.mesmaData);
+  html += bloco("Mesmo Nome", res.mesmoNome);
+
+  if (res.combinacaoCartao && res.combinacaoCartao.length > 0) {
+    html += bloco("Combinação Cartão", res.combinacaoCartao);
+  }
+
+  if (!html.trim()) {
+    html = `<i>Nenhuma sugestão encontrada.</i>`;
+  }
+
+  body.innerHTML = html;
+  popup.style.display = "block";
+}
+
+
 // ------------------------------------------------------------
 // RENDER: arquivos importados (OFX / SYS)
 // ------------------------------------------------------------
@@ -222,9 +398,9 @@ function detectPaymentTypeFromOfx(desc) {
   const t = removerAcentos(String(desc).toLowerCase());
 
   if (t.includes('pix')) return 'PIX';
-  if (t.includes('cartao') || t.includes('cred') || t.includes('tef') || t.includes('master') || t.includes('visa')) return 'CARTAO';
-  if (t.includes('boleto')) return 'BOLETO';
-  if (t.includes('transfer') || t.includes('deposit') || t.includes('dep.')) return 'TRANSFER';
+  if (t.includes('cartao') || t.includes('carto') || t.includes('credito') || t.includes('debito')) return 'CARTAO';
+  if (t.includes('boleto') || t.includes('cobrana')) return 'BOLETO';
+  if (t.includes('transfer') || t.includes('dep') || t.includes('ted')) return 'TRANSFER';
 
   return 'OUTRO';
 }
@@ -354,44 +530,60 @@ function parseMatricial(html, filename) {
   const fileKindLabel = isPagar ? "Saída" : "Entrada";
 
 
-  Object.keys(linhas).sort((a, b) => a - b).forEach((top, idx) => {
+  let atual = null;
+  let idx = 0;
+
+  Object.keys(linhas).sort((a, b) => a - b).forEach(top => {
     const cols = linhas[top];
-    let cliente = null, doc = null, valor = null, pagto = null, nf = null, vendedor = null, tipo = null;
 
     cols.forEach(c => {
       const txt = c.text;
 
-      if (inside(c.left, COL_CLIENTE)) cliente = removerAcentos(txt);
-      else if (inside(c.left, COL_DOC)) doc = txt;
-      else if (inside(c.left, COL_VALOR) && /\d+[\.,]\d{2}/.test(txt)) {
-        valor = parseFloat(txt.replace(/\./g, "").replace(/,/g, "."));
+      // NOVO LANÇAMENTO: detectado pelo VALOR
+      if (inside(c.left, COL_VALOR) && /\d+[\.,]\d{2}/.test(txt)) {
+
+        // fecha o anterior
+        if (atual && atual.valor !== null) {
+          resultado.push(atual);
+        }
+
+        // inicia novo lançamento
+        atual = {
+          id: `${filename || 'SIST'}_${idx++}`,
+          systemFileName: filename || '',
+          fileKind: fileKindLabel,
+          cliente: null,
+          doc: null,
+          valor: (isPagar ? -1 : 1) * parseFloat(txt.replace(/\./g, "").replace(/,/g, ".")),
+          data: null,
+          nf: null,
+          vendedor: null,
+          tipo: null,
+          conciliado: false,
+          desativado: false
+        };
+
+        return;
       }
+
+      if (!atual) return;
+
+      if (inside(c.left, COL_CLIENTE)) atual.cliente = removerAcentos(txt);
+      else if (inside(c.left, COL_DOC)) atual.doc = txt;
       else if (inside(c.left, COL_PAGTO) && /^\d{2}\/\d{2}\/\d{4}$/.test(txt)) {
         const [d, m, y] = txt.split("/");
-        pagto = `${y}-${m}-${d}`;
+        atual.data = `${y}-${m}-${d}`;
       }
-      else if (inside(c.left, COL_TIPO)) tipo = removerAcentos(txt);
-      else if (inside(c.left, COL_VENDEDOR)) vendedor = removerAcentos(txt);
-      else if (inside(c.left, COL_NF) && /^\d+$/.test(txt)) nf = txt;
+      else if (inside(c.left, COL_TIPO)) atual.tipo = removerAcentos(txt);
+      else if (inside(c.left, COL_VENDEDOR)) atual.vendedor = removerAcentos(txt);
+      else if (inside(c.left, COL_NF) && /^\d+$/.test(txt)) atual.nf = txt;
     });
-
-    if (valor !== null) {
-      resultado.push({
-        id: `${filename || 'SIST'}_${idx}`,
-        systemFileName: filename || '',
-        fileKind: fileKindLabel,
-        cliente,
-        doc,
-        valor: isPagar ? (valor * -1) : valor,
-        data: pagto,
-        nf,
-        vendedor,
-        tipo,
-        conciliado: false,
-        desativado: false
-      });
-    }
   });
+
+  // fecha o último lançamento
+  if (atual && atual.valor !== null) {
+    resultado.push(atual);
+  }
 
   return resultado;
 }
@@ -870,13 +1062,26 @@ function renderList() {
       if (selectedBanco.has(item.id)) selectedBanco.delete(item.id);
       else selectedBanco.add(item.id);
 
+      // Fechar popup se não houver mais seleção
+      if (selectedBanco.size === 0) {
+        const popup = document.getElementById("popupSugestoes");
+        if (popup) popup.style.display = "none";
+      }
+
+      // Abrir/atualizar popup quando houver exatamente 1 item selecionado
+      if (selectedBanco.size === 1) {
+        const res = buscarSugestoes(item);
+        mostrarPopupSugestoes(res);
+      }
+      else if (selectedBanco.size > 1) {
+        const itens = banco.filter(b => selectedBanco.has(b.id));
+        const res = buscarSugestoesMultiplosBanco(itens);
+        mostrarPopupSugestoes(res);
+      }
+
+
       atualizarPainelDiferenca();
       renderList();
-    });
-
-    div.addEventListener("dblclick", ev => {
-      if (ev.target.tagName === "SPAN") return;
-      toggleDesativado(item);
     });
 
     div.addEventListener("contextmenu", ev => {
@@ -986,11 +1191,6 @@ function renderList() {
 
       atualizarPainelDiferenca();
       renderList();
-    });
-
-    div.addEventListener("dblclick", ev => {
-      if (ev.target.tagName === "SPAN") return;
-      toggleDesativado(item);
     });
 
 
@@ -1112,6 +1312,11 @@ function conciliar() {
 
   renderList();
   alert("Itens conciliados!");
+
+  // fechar popup de sugestões após conciliar
+  const popup = document.getElementById("popupSugestoes");
+  if (popup) popup.style.display = "none";
+
 }
 
 // ------------------------------------------------------------
@@ -1166,6 +1371,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const aplicarFiltrosBtn = document.getElementById("aplicarFiltros");
   const btnExportarTopo = document.getElementById("btnExportarTopo");
   const btnSalvarTopo = document.getElementById("btnSalvarTopo");
+
+  document.getElementById("popupSugestoesClose").onclick = () => {
+    document.getElementById("popupSugestoes").style.display = "none";
+  };
+
 
   // ------------------------------
   // BOTÃO + → ABRIR MODAL MANUAL
