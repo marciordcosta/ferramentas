@@ -1,5 +1,7 @@
 // ------------------------------------------------------------
 // conciliacao.organizado.js
+// Versão reorganizada e com duplicidades consolidadas (sem alterar lógica)
+// Mantive duplicidade do menu de contexto (OPÇÃO A)
 // ------------------------------------------------------------
 
 // Estado global
@@ -31,17 +33,25 @@ function formatMoney(n) {
 }
 
 function formatarContabil(n) {
-    if (n == null || isNaN(n)) return "0,00";
+  if (n == null || isNaN(n)) return "0,00";
 
-    const v = Number(n).toFixed(2);     // 1234.56
-    const partes = v.split(".");        // ["1234","56"]
-    const inteiro = partes[0];          
-    const decimal = partes[1];
+  const v = Number(n).toFixed(2);     // 1234.56
+  const partes = v.split(".");        // ["1234","56"]
+  const inteiro = partes[0];
+  const decimal = partes[1];
 
-    const inteiroFormatado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    return inteiroFormatado + "," + decimal;
+  const inteiroFormatado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return inteiroFormatado + "," + decimal;
 }
 
+function formatDateBR(iso) {
+  if (!iso) return '---';
+  const parts = iso.split("-");
+  if (parts.length !== 3) return iso;
+
+  const [yyyy, mm, dd] = parts;
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 function safeIdForHtml(s) {
   return String(s || "").replace(/"/g, '&quot;').replace(/'/g, "\\'");
@@ -49,7 +59,7 @@ function safeIdForHtml(s) {
 
 function gerarChave() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return 'k' + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36);
+  return 'k' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 }
 
 function normalizeFileName(n) {
@@ -137,8 +147,8 @@ function getCategoriaOfx(desc) {
   const t = removerAcentos(String(desc || "").toLowerCase());
 
   if (t.includes("pix") ||
-      t.includes("dep") || t.includes("deposit") || t.includes("dinheiro") ||
-      t.includes("transf") || t.includes("transfer") || t.includes("ted") || t.includes("doc"))
+    t.includes("dep") || t.includes("deposit") || t.includes("dinheiro") ||
+    t.includes("transf") || t.includes("transfer") || t.includes("ted") || t.includes("doc"))
     return "PIX";
 
   if (t.includes("cartao") || t.includes("cred") || t.includes("visa") || t.includes("master"))
@@ -152,18 +162,18 @@ function getCategoriaOfx(desc) {
 
 function getBolaOfx(desc) {
   const s = String(desc || "").toLowerCase();
-  const t = removerAcentos(s).replace(/\s+/g,' ').trim();
+  const t = removerAcentos(s).replace(/\s+/g, ' ').trim();
 
   if (t.includes('pix') ||
-      t.includes('dep ') || t.startsWith('dep.') || t.includes('deposito') || t.includes('deposit') ||
-      t.includes('dinheiro') ||
-      t.includes('transf') || t.includes('transferencia') || t.includes('ted') || t.includes('doc')) {
+    t.includes('dep ') || t.startsWith('dep.') || t.includes('deposito') || t.includes('deposit') ||
+    t.includes('dinheiro') ||
+    t.includes('transf') || t.includes('transferencia') || t.includes('ted') || t.includes('doc')) {
     return paymentColor.PIX;
   }
 
   if (t.includes('cartao') || t.includes('cartão') || t.includes('carto') || t.includes('carte') ||
-      t.includes('crd') || t.includes('cred') || t.includes('credito') ||
-      t.includes('visa') || t.includes('master') || t.includes('elo') || t.includes('tef')) {
+    t.includes('crd') || t.includes('cred') || t.includes('credito') ||
+    t.includes('visa') || t.includes('master') || t.includes('elo') || t.includes('tef')) {
     return paymentColor.CARTAO;
   }
 
@@ -187,16 +197,16 @@ function getCategoriaSistema(tipo) {
 
 function getBolaSistema(tipo) {
   const s = String(tipo || "").toLowerCase();
-  const t = removerAcentos(s).replace(/\s+/g,' ').trim();
+  const t = removerAcentos(s).replace(/\s+/g, ' ').trim();
 
   if (t.includes('pix') ||
-      t.includes('dep') || t.includes('deposito') || t.includes('deposit') ||
-      t.includes('transf') || t.includes('transferencia') || t.includes('ted') || t.includes('doc'))
+    t.includes('dep') || t.includes('deposito') || t.includes('deposit') ||
+    t.includes('transf') || t.includes('transferencia') || t.includes('ted') || t.includes('doc'))
     return paymentColor.PIX;
 
   if (t.includes('cartao') || t.includes('cartão') || t.includes('carto') ||
-      t.includes('crd') || t.includes('cred') || t.includes('credito') ||
-      t.includes('debito') || t.includes('deb'))
+    t.includes('crd') || t.includes('cred') || t.includes('credito') ||
+    t.includes('debito') || t.includes('deb'))
     return paymentColor.CARTAO;
 
   if (t.includes('boleto')) return paymentColor.BOLETO;
@@ -311,13 +321,13 @@ function parseMatricial(html, filename) {
 
   const resultado = [];
 
-  const COL_CLIENTE  = [70, 140];
-  const COL_DOC      = [140, 200];
-  const COL_VALOR    = [200, 260];
-  const COL_PAGTO    = [480, 530];
-  const COL_TIPO     = [530, 600];
+  const COL_CLIENTE = [70, 140];
+  const COL_DOC = [140, 200];
+  const COL_VALOR = [200, 260];
+  const COL_PAGTO = [480, 530];
+  const COL_TIPO = [530, 600];
   const COL_VENDEDOR = [600, 700];
-  const COL_NF       = [700, 800];
+  const COL_NF = [700, 800];
 
   function inside(x, r) { return x >= r[0] && x <= r[1]; }
 
@@ -329,24 +339,24 @@ function parseMatricial(html, filename) {
 
   // função de busca parcial
   function match(k) {
-      return normalizedHTML.includes(k) || normalizedFile.includes(k);
+    return normalizedHTML.includes(k) || normalizedFile.includes(k);
   }
 
   // DETECÇÃO AUTOMÁTICA DE SAÍDA
   const isPagar =
-      match("paga") ||      // pagamento, pagar, pagas, pagou, pagto
-      match("saida") ||     // saida, saídas, saidas
-      match("desp") ||      // despesa, despesas
-      match("deb")  ||      // debito, débito, debitado
-      match("retir");       // retirada, retirar, retirado
+    match("paga") ||      // pagamento, pagar, pagas, pagou, pagto
+    match("saida") ||     // saida, saídas, saidas
+    match("desp") ||      // despesa, despesas
+    match("deb") ||      // debito, débito, debitado
+    match("retir");       // retirada, retirar, retirado
 
   // rótulo final
   const fileKindLabel = isPagar ? "Saída" : "Entrada";
-  
 
-  Object.keys(linhas).sort((a,b)=>a-b).forEach((top, idx) => {
+
+  Object.keys(linhas).sort((a, b) => a - b).forEach((top, idx) => {
     const cols = linhas[top];
-    let cliente=null, doc=null, valor=null, pagto=null, nf=null, vendedor=null, tipo=null;
+    let cliente = null, doc = null, valor = null, pagto = null, nf = null, vendedor = null, tipo = null;
 
     cols.forEach(c => {
       const txt = c.text;
@@ -354,10 +364,10 @@ function parseMatricial(html, filename) {
       if (inside(c.left, COL_CLIENTE)) cliente = removerAcentos(txt);
       else if (inside(c.left, COL_DOC)) doc = txt;
       else if (inside(c.left, COL_VALOR) && /\d+[\.,]\d{2}/.test(txt)) {
-        valor = parseFloat(txt.replace(/\./g,"").replace(/,/g,"."));
+        valor = parseFloat(txt.replace(/\./g, "").replace(/,/g, "."));
       }
       else if (inside(c.left, COL_PAGTO) && /^\d{2}\/\d{2}\/\d{4}$/.test(txt)) {
-        const [d,m,y] = txt.split("/");
+        const [d, m, y] = txt.split("/");
         pagto = `${y}-${m}-${d}`;
       }
       else if (inside(c.left, COL_TIPO)) tipo = removerAcentos(txt);
@@ -464,7 +474,7 @@ function calcTotals(list, isSistema = false) {
   const totals = { count: 0, entradas: 0, saidas: 0 };
 
   list.forEach(it => {
-    if (it.desativado) return; 
+    if (it.desativado) return;
 
     totals.count++;
     const v = Number(isSistema ? (it.valor || 0) : (it.amount || 0));
@@ -489,7 +499,7 @@ function atualizarTotais() {
   document.getElementById('t_ofx_saldo').textContent = formatarContabil(saldoOfx);
   const elOfxSaldo = document.getElementById("t_ofx_saldo");
   elOfxSaldo.style.color = saldoOfx > 0 ? "green" :
-                          saldoOfx < 0 ? "red" : "#333";
+    saldoOfx < 0 ? "red" : "#333";
 
 
   // SISTEMA
@@ -501,7 +511,7 @@ function atualizarTotais() {
   document.getElementById('t_sys_saldo').textContent = formatarContabil(saldoSys);
   const elSysSaldo = document.getElementById("t_sys_saldo");
   elSysSaldo.style.color = saldoSys > 0 ? "green" :
-                          saldoSys < 0 ? "red" : "#333";
+    saldoSys < 0 ? "red" : "#333";
 
 }
 
@@ -509,44 +519,44 @@ function atualizarTotais() {
 // CONCILIAÇÃO / CANCELAR
 // ------------------------------------------------------------
 function cancelarConciliacao(chave) {
-    if (!chave) return;
+  if (!chave) return;
 
-    // remover conciliação dos itens de banco e coletar FAKEs para excluir
-    let idsFakeParaRemover = [];
+  // remover conciliação dos itens de banco e coletar FAKEs para excluir
+  let idsFakeParaRemover = [];
 
-    banco.forEach(b => {
-        if (b.parChave === chave) {
+  banco.forEach(b => {
+    if (b.parChave === chave) {
 
-            // se for item manual FAKE_, marcar para exclusão
-            if (String(b.id).startsWith("FAKE_")) {
-                idsFakeParaRemover.push(b.id);
-            }
+      // se for item manual FAKE_, marcar para exclusão
+      if (String(b.id).startsWith("FAKE_")) {
+        idsFakeParaRemover.push(b.id);
+      }
 
-            b.conciliado = false;
-            delete b.parChave;
-            delete b.nf;
-            delete b.cliente;
-            delete b.doc;
-            delete b.tipo;
-            delete b.dataSistema;
-        }
-    });
-
-    // remover os FAKEs do array banco
-    if (idsFakeParaRemover.length > 0) {
-        banco = banco.filter(b => !idsFakeParaRemover.includes(b.id));
+      b.conciliado = false;
+      delete b.parChave;
+      delete b.nf;
+      delete b.cliente;
+      delete b.doc;
+      delete b.tipo;
+      delete b.dataSistema;
     }
+  });
 
-    // remover conciliação do sistema
-    sistema.forEach(s => {
-        if (s.parChave === chave) {
-            s.conciliado = false;
-            delete s.parChave;
-        }
-    });
+  // remover os FAKEs do array banco
+  if (idsFakeParaRemover.length > 0) {
+    banco = banco.filter(b => !idsFakeParaRemover.includes(b.id));
+  }
 
-    renderList();
-    atualizarTotais();
+  // remover conciliação do sistema
+  sistema.forEach(s => {
+    if (s.parChave === chave) {
+      s.conciliado = false;
+      delete s.parChave;
+    }
+  });
+
+  renderList();
+  atualizarTotais();
 }
 
 
@@ -571,19 +581,35 @@ function atualizarPainelDiferenca() {
 
   const somaBanco = banco
     .filter(x => selectedBanco.has(x.id) && !x.desativado)
-    .reduce((t,x)=>t + (Number(x.amount)||0), 0);
+    .reduce((t, x) => t + (Number(x.amount) || 0), 0);
 
   const somaSistema = sistema
     .filter(x => selectedSistema.has(x.id) && !x.desativado)
-    .reduce((t,x)=>t + (Number(x.valor)||0), 0);
+    .reduce((t, x) => t + (Number(x.valor) || 0), 0);
 
   const dif = somaBanco - somaSistema;
+
+  // calcular percentual SOMENTE quando o tipo do banco for CARTAO
+  let percStr = "";
+  const itemBanco = banco.find(x => selectedBanco.has(x.id));
+
+  if (itemBanco && (itemBanco.payment_type || "").toUpperCase() === "CARTAO") {
+
+    if (somaSistema === 0) {
+      // evita Infinity – mostra apenas "(%)"
+      percStr = ` <span style="font-size:12px; color:#555;">(%)</span>`;
+    } else {
+      const perc = (dif / somaSistema) * 100;
+      percStr = ` <span style="font-size:12px; color:#555;">(${perc.toFixed(2)}%)</span>`;
+    }
+  }
 
   p.innerHTML = `
     <div style="font-size:18px; font-weight:bold; margin-bottom:6px;">
       Diferença:
       <span style="color:${Math.abs(dif) < 0.01 ? 'green' : 'red'};">
         R$ ${dif.toFixed(2)}
+        </span> ${percStr}
       </span>
     </div>
 
@@ -628,33 +654,33 @@ function atualizarPainelDiferenca() {
 // DESATIVAR / REATIVAR REGISTRO
 // ------------------------------------------------------------
 function toggleDesativado(item) {
-    item.desativado = !item.desativado;   // alterna estado
+  item.desativado = !item.desativado;   // alterna estado
 
-    // remove seleções para evitar inconsistências
-    selectedBanco.delete(item.id);
-    selectedSistema.delete(item.id);
+  // remove seleções para evitar inconsistências
+  selectedBanco.delete(item.id);
+  selectedSistema.delete(item.id);
 
-    renderList();
-    atualizarTotais();
+  renderList();
+  atualizarTotais();
 }
 
 // ------------------------------------------------------------
 // CONCILIAR MANUAL (apenas Sistema -> cria OFX falso)
 // ------------------------------------------------------------
 function conciliarManualSistema(itemSistema) {
-    if (!itemSistema) return;
+  if (!itemSistema) return;
 
-    // impedir duplicações múltiplas
-    if (itemSistema.conciliado) {
-        alert("Este item já está conciliado.");
-        return;
-    }
+  // impedir duplicações múltiplas
+  if (itemSistema.conciliado) {
+    alert("Este item já está conciliado.");
+    return;
+  }
 
-    // chave única igual às conciliações normais
-    const chave = gerarChave();
+  // chave única igual às conciliações normais
+  const chave = gerarChave();
 
-    // cria OFX falso com os mesmos dados do sistema
-    const fake = {
+  // cria OFX falso com os mesmos dados do sistema
+  const fake = {
     id: "FAKE_" + gerarChave(),
     ofxFileName: "MANUAL",
     bank: "999",
@@ -677,19 +703,19 @@ function conciliarManualSistema(itemSistema) {
     tipo: itemSistema.tipo || "",
     doc: itemSistema.doc || "",
     dataSistema: itemSistema.data || ""
-};
+  };
 
 
-    // marcar o item do sistema como conciliado
-    itemSistema.conciliado = true;
-    itemSistema.parChave = chave;
+  // marcar o item do sistema como conciliado
+  itemSistema.conciliado = true;
+  itemSistema.parChave = chave;
 
-    // joga o item manual no array de banco
-    banco.push(fake);
+  // joga o item manual no array de banco
+  banco.push(fake);
 
-    // re-renderizar
-    renderList();
-    atualizarTotais();
+  // re-renderizar
+  renderList();
+  atualizarTotais();
 }
 
 window.conciliarManualSistema = conciliarManualSistema;
@@ -701,29 +727,29 @@ const ctxToggle = document.getElementById("ctxToggle");
 
 // fechar menu ao clicar fora
 document.addEventListener("click", () => {
-    ctxMenu.style.display = "none";
+  ctxMenu.style.display = "none";
 });
 
 // ação do botão no menu de contexto
 ctxToggle.addEventListener("click", () => {
-    if (!ctxTarget) return;
+  if (!ctxTarget) return;
 
-    toggleDesativado(ctxTarget);
-    ctxMenu.style.display = "none";
+  toggleDesativado(ctxTarget);
+  ctxMenu.style.display = "none";
 });
 
 // ação do botão "Conciliar manual"
 document.getElementById("ctxConcManual").addEventListener("click", () => {
-    if (!ctxTarget) return;
+  if (!ctxTarget) return;
 
-    // só permite conciliar manual itens do sistema
-    if (sistema.includes(ctxTarget)) {
-        conciliarManualSistema(ctxTarget);
-    } else {
-        alert("Conciliação manual só pode ser usada em registros do Sistema.");
-    }
+  // só permite conciliar manual itens do sistema
+  if (sistema.includes(ctxTarget)) {
+    conciliarManualSistema(ctxTarget);
+  } else {
+    alert("Conciliação manual só pode ser usada em registros do Sistema.");
+  }
 
-    ctxMenu.style.display = "none";
+  ctxMenu.style.display = "none";
 });
 
 
@@ -742,7 +768,7 @@ function renderList() {
   const bancoFinal = bancoFiltered.filter(item => {
     if (!textoBanco) return true;
     return (
-      String(Math.abs(item.amount)).includes(textoBanco)||
+      String(Math.abs(item.amount)).includes(textoBanco) ||
       String(item.desc || "").toLowerCase().includes(textoBanco) ||
       String(item.nf || "").toLowerCase().includes(textoBanco) ||
       String(item.doc || "").toLowerCase().includes(textoBanco) ||
@@ -753,7 +779,7 @@ function renderList() {
   const sistemaFinal = sistemaFiltered.filter(item => {
     if (!textoSistema) return true;
     return (
-      String(Math.abs(item.valor)).includes(textoSistema)||
+      String(Math.abs(item.valor)).includes(textoSistema) ||
       String(item.cliente || "").toLowerCase().includes(textoSistema) ||
       String(item.tipo || "").toLowerCase().includes(textoSistema) ||
       String(item.nf || "").toLowerCase().includes(textoSistema) ||
@@ -772,9 +798,9 @@ function renderList() {
     if (selectedBanco.has(item.id)) div.classList.add("selected");
     if (item.desativado) div.classList.add("desativado");
 
-    const xBtn = item.conciliado 
+    const xBtn = item.conciliado
       ? `<span style="position:absolute; top:6px; right:6px; cursor:pointer;color:red;font-weight:bold;"
-           onclick="window.cancelarConciliacao('${safeIdForHtml(item.parChave||"")}')">×</span>`
+           onclick="window.cancelarConciliacao('${safeIdForHtml(item.parChave || "")}')">×</span>`
       : "";
 
     div.innerHTML = `
@@ -788,7 +814,7 @@ function renderList() {
             ${formatMoney(item.amount)}
           </b>
 
-          — ${item.date || '---'}
+          — ${formatDateBR(item.date)}
 
           <!-- BADGE DA FORMA DE PAGAMENTO -->
           <span style="
@@ -854,28 +880,28 @@ function renderList() {
     });
 
     div.addEventListener("contextmenu", ev => {
-    ev.preventDefault();
-    ev.stopPropagation();
+      ev.preventDefault();
+      ev.stopPropagation();
 
-    ctxTarget = item;
+      ctxTarget = item;
 
-    // monta menu simples (apenas ativar / desativar)
-    ctxMenu.innerHTML = `
+      // monta menu simples (apenas ativar / desativar)
+      ctxMenu.innerHTML = `
         <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">
             ${item.desativado ? "Reativar" : "Desativar"}
         </div>
     `;
 
-    ctxMenu.style.left = ev.pageX + "px";
-    ctxMenu.style.top  = ev.pageY + "px";
-    ctxMenu.style.display = "block";
+      ctxMenu.style.left = ev.pageX + "px";
+      ctxMenu.style.top = ev.pageY + "px";
+      ctxMenu.style.display = "block";
 
-    // evento
-    document.getElementById("ctxToggle").onclick = () => {
+      // evento
+      document.getElementById("ctxToggle").onclick = () => {
         toggleDesativado(item);
         ctxMenu.style.display = "none";
-    };
-});
+      };
+    });
 
 
     lb?.appendChild(div);
@@ -889,9 +915,9 @@ function renderList() {
     if (selectedSistema.has(item.id)) div.classList.add("selected");
     if (item.desativado) div.classList.add("desativado");
 
-    const xBtn = item.conciliado 
+    const xBtn = item.conciliado
       ? `<span style="position:absolute; top:6px; right:6px; cursor:pointer;color:red;font-weight:bold;"
-           onclick="window.cancelarConciliacao('${safeIdForHtml(item.parChave||"")}')">×</span>`
+           onclick="window.cancelarConciliacao('${safeIdForHtml(item.parChave || "")}')">×</span>`
       : "";
 
     const semNF = !item.nf;
@@ -908,7 +934,7 @@ function renderList() {
             R$ ${(item.valor < 0 ? '-' : '') + Math.abs(Number(item.valor || 0)).toFixed(2)}
           </b>
 
-          — ${item.data || '---'}
+          — ${formatDateBR(item.data)}
 
           <!-- BADGE DA FORMA DE PAGAMENTO -->
           <span style="
@@ -967,35 +993,60 @@ function renderList() {
       toggleDesativado(item);
     });
 
-    // menu do banco
+
     div.addEventListener("contextmenu", ev => {
-    ev.preventDefault();
-    ev.stopPropagation();
+      ev.preventDefault();
+      ev.stopPropagation();
 
-    ctxTarget = item;
+      ctxTarget = item;
 
-    // SE FOR SISTEMA → menu com 2 opções
-    ctxMenu.innerHTML = `
-        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">${item.desativado ? "Reativar" : "Desativar"}</div>
+      // menu exclusivo do SISTEMA
+      ctxMenu.innerHTML = `
+        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">
+            ${item.desativado ? "Reativar" : "Desativar"}
+        </div>
+
         <div id="ctxManual" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
             Conciliar manual (Sistema → OFX)
         </div>
+
+        <div id="ctxExcluir" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+            Excluir registro
+        </div>
     `;
 
-    ctxMenu.style.left = ev.pageX + "px";
-    ctxMenu.style.top = ev.pageY + "px";
-    ctxMenu.style.display = "block";
+      ctxMenu.style.left = ev.pageX + "px";
+      ctxMenu.style.top = ev.pageY + "px";
+      ctxMenu.style.display = "block";
 
-    document.getElementById("ctxToggle").onclick = () => {
+      // DESATIVAR / REATIVAR
+      document.getElementById("ctxToggle").onclick = () => {
         toggleDesativado(item);
         ctxMenu.style.display = "none";
-    };
+      };
 
-    document.getElementById("ctxManual").onclick = () => {
+      // CONCILIAR MANUAL
+      document.getElementById("ctxManual").onclick = () => {
         conciliarManualSistema(item);
         ctxMenu.style.display = "none";
-    };
-});
+      };
+
+      // EXCLUIR REGISTRO
+      document.getElementById("ctxExcluir").onclick = () => {
+        if (item.conciliado) {
+          alert("Este item está conciliado. Cancele a conciliação antes de excluir.");
+        } else {
+          const index = sistema.findIndex(s => s.id === item.id);
+          if (index > -1) {
+            sistema.splice(index, 1);
+            renderList();
+            atualizarTotais();
+            alert("Registro excluído com sucesso.");
+          }
+        }
+        ctxMenu.style.display = "none";
+      };
+    });
 
 
     ls?.appendChild(div);
@@ -1012,19 +1063,19 @@ function conciliar() {
 
   // bloquear conciliação de itens desativados
   for (const id of selectedBanco) {
-      const b = banco.find(x => x.id === id);
-      if (b?.desativado) {
-          alert("Há itens desativados selecionados no banco.");
-          return;
-      }
+    const b = banco.find(x => x.id === id);
+    if (b?.desativado) {
+      alert("Há itens desativados selecionados no banco.");
+      return;
+    }
   }
 
   for (const id of selectedSistema) {
-      const s = sistema.find(x => x.id === id);
-      if (s?.desativado) {
-          alert("Há itens desativados selecionados no sistema.");
-          return;
-      }
+    const s = sistema.find(x => x.id === id);
+    if (s?.desativado) {
+      alert("Há itens desativados selecionados no sistema.");
+      return;
+    }
   }
 
   if (selectedBanco.size === 0 || selectedSistema.size === 0) {
@@ -1086,7 +1137,7 @@ function exportarCSV() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `conciliado_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `conciliado_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
 }
 
@@ -1116,6 +1167,117 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnExportarTopo = document.getElementById("btnExportarTopo");
   const btnSalvarTopo = document.getElementById("btnSalvarTopo");
 
+  // ------------------------------
+  // BOTÃO + → ABRIR MODAL MANUAL
+  // ------------------------------
+  const modalAddManual = document.getElementById("modalAddManual");
+
+  document.getElementById("btnAddManual")?.addEventListener("click", () => {
+    modalAddManual.style.display = "flex";
+  });
+
+  document.getElementById("btnCancelarManual")?.addEventListener("click", () => {
+    modalAddManual.style.display = "none";
+  });
+
+  // ------------------------------------
+  // MODAL ARRASTÁVEL (APENAS A CAIXA)
+  // ------------------------------------
+  (function () {
+    const modal = document.getElementById("modalAddManual");
+    const box = modal.querySelector(".modal-box");
+
+    let dragging = false;
+    let startX = 0, startY = 0;
+    let origX = 0, origY = 0;
+
+    box.addEventListener("mousedown", e => {
+      dragging = true;
+
+      const rect = box.getBoundingClientRect();
+
+      origX = rect.left;
+      origY = rect.top;
+
+      startX = e.clientX;
+      startY = e.clientY;
+
+      document.body.style.userSelect = "none";
+    });
+
+    document.addEventListener("mousemove", e => {
+      if (!dragging) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      box.style.position = "fixed";
+      box.style.left = (origX + dx) + "px";
+      box.style.top = (origY + dy) + "px";
+    });
+
+    document.addEventListener("mouseup", () => {
+      dragging = false;
+      document.body.style.userSelect = "";
+    });
+  })();
+
+
+  document.getElementById("btnSalvarManual")?.addEventListener("click", () => {
+
+    const data = document.getElementById("m_data").value;
+    const valor = parseFloat(document.getElementById("m_valor").value || "0");
+    const cliente = document.getElementById("m_cliente").value.trim();
+    const tipo = document.getElementById("m_tipo").value.trim();
+    const doc = document.getElementById("m_doc").value.trim();
+    const nf = document.getElementById("m_nf").value.trim();
+
+    // validação simples
+    if (!data || !valor || !cliente || !tipo) {
+      alert("Preencha Data, Valor, Cliente e Tipo.");
+      return;
+    }
+
+    const item = {
+      id: "manual_" + Date.now() + "_" + Math.floor(Math.random() * 99999),
+
+      data,
+      valor,
+      cliente,
+      tipo,
+      doc,
+      nf,
+
+      // campos automáticos
+      conciliado: false,
+      desativado: false,
+      fileKind: "manual",
+      systemFileName: "manual"
+    };
+
+    // adiciona ao array do sistema
+    sistema.push(item);
+
+    // fecha modal
+    modalAddManual.style.display = "none";
+
+    // limpa campos
+    document.getElementById("m_data").value = "";
+    document.getElementById("m_valor").value = "";
+    document.getElementById("m_cliente").value = "";
+    document.getElementById("m_tipo").value = "";
+    document.getElementById("m_doc").value = "";
+    document.getElementById("m_nf").value = "";
+
+    // atualiza UI
+    renderList();
+    atualizarTotais();
+
+    alert("Registro adicionado com sucesso.");
+  });
+
+
+
   if (processBtn) {
     processBtn.addEventListener("click", async () => {
       selectedBanco.clear();
@@ -1123,26 +1285,56 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const ofxInput = document.getElementById("ofxFiles");
       const ofxFiles = ofxInput ? Array.from(ofxInput.files) : [];
+
+      // contador total adicionado nesta operação
+      let totalAdicionadosNestaOperacao = 0;
+
+      // --- OFX: processa e filtra duplicados (OFX vs OFX) ---
       for (const f of ofxFiles) {
         try {
-          if (arquivosOFX.includes(normalizeFileName(f.name))) {
+          const nomeNorm = normalizeFileName(f.name);
+          if (arquivosOFX.includes(nomeNorm)) {
             alert("arquivo já importado");
             continue;
           }
 
           const txt = await f.text();
           const parsed = parseOFX(txt, f.name);
-          banco.push(...parsed);
 
-          arquivosOFX.push(normalizeFileName(f.name));
+          let adicionadosPorArquivo = 0;
+
+          // Filtrar duplicados (comparação literal usando os campos normalizados existentes)
+          for (const item of parsed) {
+            const ehDuplicado = banco.some(b => {
+              return (b.date || "") === (item.date || "") &&
+                Number(b.amount || 0) === Number(item.amount || 0) &&
+                (b.desc || "") === (item.desc || "") &&
+                (b.payment_type || "") === (item.payment_type || "") &&
+                (b.bank || "") === (item.bank || "") &&
+                (b.bankName || "") === (item.bankName || "");
+            });
+
+            if (!ehDuplicado) {
+              banco.push(item);
+              adicionadosPorArquivo++;
+            }
+          }
+
+          if (adicionadosPorArquivo > 0) {
+            totalAdicionadosNestaOperacao += adicionadosPorArquivo;
+            arquivosOFX.push(nomeNorm); // só registra arquivo se trouxe algo novo
+          }
 
         } catch (e) {
           console.error("Erro NO OFX", f.name, e);
         }
       }
 
+
       const htmlInput = document.getElementById("htmlFile");
       const htmlFiles = htmlInput ? Array.from(htmlInput.files) : [];
+
+      // --- HTML (Sistema): processa e filtra duplicados (HTML vs HTML) ---
       for (const hf of htmlFiles) {
         try {
           const nomeNormSys = normalizeFileName(hf.name);
@@ -1153,14 +1345,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const htmlTxt = await hf.text();
           const parsedSys = parseMatricial(htmlTxt, hf.name);
-          sistema.push(...parsedSys);
 
-          arquivosSYS.push(nomeNormSys);
+          let adicionadosPorArquivoSys = 0;
+
+          // Filtrar duplicados dentro do array `sistema`
+          for (const item of parsedSys) {
+            const ehDuplicadoSys = sistema.some(s => {
+              return (s.data || "") === (item.data || "") &&
+                Number(s.valor || 0) === Number(item.valor || 0) &&
+                (s.cliente || "") === (item.cliente || "") &&
+                (s.tipo || "") === (item.tipo || "") &&
+                (s.doc || "") === (item.doc || "") &&
+                (s.nf || "") === (item.nf || "");
+            });
+
+            if (!ehDuplicadoSys) {
+              sistema.push(item);
+              adicionadosPorArquivoSys++;
+            }
+          }
+
+          if (adicionadosPorArquivoSys > 0) {
+            totalAdicionadosNestaOperacao += adicionadosPorArquivoSys;
+            arquivosSYS.push(nomeNormSys);
+          }
 
         } catch (e) {
           console.error("Erro no HTML", hf.name, e);
         }
       }
+
 
       banco.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
       sistema.sort((a, b) => (a.data || "").localeCompare(b.data || ""));
@@ -1171,6 +1385,8 @@ document.addEventListener("DOMContentLoaded", () => {
       renderArquivosImportados();
       renderList();
       atualizarTotais();
+
+      alert(`Importação concluída: ${totalAdicionadosNestaOperacao} registros novos adicionados.`);
     });
   }
 
@@ -1240,11 +1456,10 @@ document.addEventListener("DOMContentLoaded", () => {
       renderArquivosImportados();
       renderList();
       atualizarTotais();
-    } catch(e) {
+    } catch (e) {
       console.error("Erro ao restaurar dados salvos", e);
     }
   }
 
   ensurePainelDiferenca();
 });
-
