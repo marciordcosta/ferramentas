@@ -747,6 +747,35 @@
 
   </div>
 
+  <div id="popupSugestoes" style="
+    display:none;
+    position:fixed;
+    top: 0;
+    left: 0;
+    margin-left: 10px;
+    margin-top: 10px;
+    width:340px;
+    background:#f5ff9a;
+    border:1px solid #ccc;
+    border-radius:8px;
+    box-shadow:0 3px 12px rgba(0,0,0,0.25);
+    padding:12px;
+    z-index:999999;
+    font-family:Arial, sans-serif;
+">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <b>Sugestões de Conciliação</b>
+      <span id="popupSugestoesClose" style="
+        cursor:pointer;
+        color: #ff0000;
+    ">X</span>
+    </div>
+
+    <div id="popupSugestoesBody" style="margin-top:10px; font-size:13px; max-height:300px; overflow-y:auto;">
+    </div>
+  </div>
+
+
 
   <script src="js/conciliacao.js"></script>
 
@@ -885,6 +914,52 @@
         const elW = el.offsetWidth, elH = el.offsetHeight;
         el.style.left = Math.min(Math.max(8, l), Math.max(8, winW - elW - 8)) + "px";
         el.style.top = Math.min(Math.max(8, t), Math.max(8, winH - elH - 8)) + "px";
+      });
+    });
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const popup = document.getElementById("popupSugestoes");
+      if (!popup) return;
+
+      const header = popup.firstElementChild;
+      if (!header) return;
+
+      popup.style.position = "fixed";
+      popup.style.cursor = "default";
+      header.style.cursor = "move";
+
+      let dragging = false;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      header.addEventListener("mousedown", e => {
+        e.preventDefault();
+        dragging = true;
+
+        const rect = popup.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        popup.style.zIndex = 1000000;
+        document.body.style.userSelect = "none";
+      });
+
+      document.addEventListener("mousemove", e => {
+        if (!dragging) return;
+
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+
+        popup.style.left = Math.max(8, x) + "px";
+        popup.style.top = Math.max(8, y) + "px";
+      });
+
+      document.addEventListener("mouseup", () => {
+        if (!dragging) return;
+        dragging = false;
+        document.body.style.userSelect = "";
       });
     });
   </script>
