@@ -1,8 +1,5 @@
 // ------------------------------------------------------------
 // conciliacao.organizado.js
-// Versão reorganizada e com duplicidades consolidadas (sem alterar lógica)
-// Mantive duplicidade do menu de contexto (OPÇÃO A)
-// ------------------------------------------------------------
 
 // Estado global
 let banco = [];
@@ -1673,3 +1670,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
