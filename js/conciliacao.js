@@ -1,11 +1,15 @@
 // ------------------------------------------------------------
 // conciliacao.organizado.js
+// ------------------------------------------------------------
 
 // Estado global
 let banco = [];
 let sistema = [];
 let selectedBanco = new Set();
 let selectedSistema = new Set();
+let registroManualEmEdicao = null;
+let modoSelecaoAtivo = false;
+
 // arquivos importados (acumulam, não substituem)
 let arquivosOFX = [];
 let arquivosSYS = [];
@@ -17,7 +21,8 @@ const paymentColor = {
   PIX: '#1E90FF',
   CARTAO: '#28a745',
   BOLETO: '#dc3545',
-  TRANSFER: '#6f42c1',
+  CHEQUE: '#ffa322ff',
+  RENDIMENTO: '#ff7ccdff',
   OUTRO: '#999999'
 };
 
@@ -70,18 +75,63 @@ function removerAcentos(str) {
     .replace(/[^a-zA-Z0-9\s]/g, "");
 }
 
+function diffDiasUteis(dataA, dataB) {
+  let d1 = new Date(dataA);
+  let d2 = new Date(dataB);
+
+  if (d1 > d2) [d1, d2] = [d2, d1];
+
+  let dias = 0;
+  const cur = new Date(d1);
+
+  while (cur <= d2) {
+    const dia = cur.getDay();
+    if (dia !== 0 && dia !== 6) dias++; // ignora sábado e domingo
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  return dias - 1; // não conta o próprio dia
+}
+
+function normalizarNomeClienteOfx(str) {
+  if (!str) return null;
+
+  return removerAcentos(str)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .toLowerCase()
+    .replace(/\b(pix|transfer|transf|dinheiro|pagamento|compra|debito|credito|cartao|boleto|cobranca|ref|id)\b/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+
 function buscarSugestoes(itemBanco) {
+  const nomeNormalizadoBase = normalizarNomeClienteOfx(itemBanco.desc);
 
   // FILTRO POR TIPO
   const tipoBanco = (itemBanco.payment_type || "").toUpperCase();
 
   const sistemaFiltradoPorTipo = sistema.filter(s => {
     const tipoSys = getCategoriaSistema(s.tipo || "").toUpperCase();
-    return tipoSys === tipoBanco;
+    if (tipoSys !== tipoBanco) return false;
+
+    // ===== FILTRO DE ENTRADA / SAÍDA (PASSO ÚNICO) =====
+    const vOfx = Number(itemBanco.amount || 0);
+    const vSys = Number(s.valor || 0);
+
+    if (vOfx < 0 && vSys >= 0) return false; // OFX saída → só saída
+    if (vOfx > 0 && vSys <= 0) return false; // OFX entrada → só entrada
+    // ==================================================
+
+    return true;
   });
 
+
   const tipoOfx = (itemBanco.payment_type || "").toUpperCase();
-  const descOfx = removerAcentos(String(itemBanco.desc || "").toLowerCase());
   const valorOfxAbs = Math.abs(Number(itemBanco.amount || 0));
   const dataOfx = itemBanco.date || null;
 
@@ -89,8 +139,48 @@ function buscarSugestoes(itemBanco) {
     mesmoValor: [],
     mesmaData: [],
     mesmoNome: [],
-    combinacaoCartao: []
+    combinacaoCartao: [],
+    mesmoRemetente: []
   };
+
+  // =====================================================
+  // MESMA DESCRIÇÃO OFX (remetente igual)
+  // =====================================================
+  const nomeBase = normalizarNomeClienteOfx(itemBanco.desc);
+
+  if (nomeBase && tipoOfx === "PIX") {
+    const iguais = banco.filter(b => {
+      if (b.id === itemBanco.id) return false;
+      if ((b.payment_type || "").toUpperCase() !== "PIX") return false;
+
+      const nomeB = normalizarNomeClienteOfx(b.desc);
+      if (!nomeB) return false;
+
+      // REGRA EXATA: nome normalizado tem que ser IGUAL
+      return nomeB === nomeBase;
+    });
+
+    if (iguais.length > 0) {
+      resp.mesmoRemetente = [itemBanco, ...iguais];
+    }
+  }
+
+
+  //PIX — MESMO NOME NORMALIZADO NO SISTEMA (prioritário)
+  if (tipoOfx === "PIX") {
+    const nomeOfx = normalizarNomeClienteOfx(itemBanco.desc);
+
+    if (nomeOfx) {
+      resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
+        const cli = removerAcentos(String(s.cliente || "").toLowerCase());
+        if (!cli) return false;
+
+        return nomeOfx.split(" ").some(p =>
+          p.length >= 4 && cli.includes(p)
+        );
+      });
+    }
+  }
 
   // ------------------------------
   // CASO: NÃO É CARTÃO
@@ -103,36 +193,99 @@ function buscarSugestoes(itemBanco) {
       return v === valorOfxAbs;
     });
 
-    // 2) MESMA DATA + valor exato ou aproximado
-    if (dataOfx) {
-      resp.mesmaData = sistemaFiltradoPorTipo.filter(s => {
-        if (s.data !== dataOfx) return false;
-
-        const v = Math.abs(Number(s.valor || 0));
-        const diff = Math.abs(v - valorOfxAbs);
-
-        return diff <= valorOfxAbs * 0.05; // até 5%
-      });
-    }
-
-    // 3) MESMO NOME (busca por palavras do desc OFX dentro do cliente do sistema)
+    //COMPARA NOME OFX COM SISTEMA
     resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
-      const cli = removerAcentos(String(s.cliente || "").toLowerCase());
-      if (!cli) return false;
 
-      // comparação simples contendo substring
-      return cli.includes(descOfx.slice(0, 5)); // compara primeiros 5 caracteres normalizados
+      // ===== FILTRO POR SINAL (PASSO ÚNICO) =====
+      const vSys = Number(s.valor || 0);
+      const vOfx = Number(itemBanco.amount || 0);
+      if (vOfx < 0 && vSys >= 0) return false; // OFX saída → só saída
+      if (vOfx > 0 && vSys <= 0) return false; // OFX entrada → só entrada
+      // =========================================
+
+      const nomeOfx = normalizarNomeClienteOfx(itemBanco.desc);
+      const nomeSys = removerAcentos(String(s.cliente || "").toLowerCase());
+
+      if (!nomeOfx || !nomeSys) return false;
+
+      const partesOfx = nomeOfx
+        .split(" ")
+        .filter(p => p.length >= 4);
+
+      if (partesOfx.length < 2) return false;
+
+      let comuns = 0;
+      for (const p of partesOfx) {
+        if (nomeSys.includes(p)) comuns++;
+        if (comuns >= 2) return true;
+      }
+
+      return false;
     });
 
     return resp;
   }
 
   // ------------------------------
+  // CASO: É BOLETO
+  // ------------------------------
+  if (tipoOfx === "BOLETO") {
+    if (!dataOfx) return resp;
+
+    const tsOfx = new Date(dataOfx).getTime();
+    const janelaDias = 2;
+
+    const itensDia = sistema.filter(s => {
+      if (!s.data) return false;
+      if (getCategoriaSistema(s.tipo) !== "BOLETO") return false;
+      return diffDiasUteis(s.data, dataOfx) <= 2;
+    });
+
+    const lista = itensDia.map(s => ({
+      ref: s,
+      valorAbs: Math.abs(Number(s.valor || 0))
+    }));
+
+    // ordenar por valor desc
+    lista.sort((a, b) => b.valorAbs - a.valorAbs);
+
+    function backtrackBoleto(i, soma, caminho) {
+      // valor EXATO
+      if (soma === valorOfxAbs) {
+        return caminho;
+      }
+      if (i >= lista.length || soma > valorOfxAbs) {
+        return null;
+      }
+
+      // incluir
+      const com = backtrackBoleto(
+        i + 1,
+        soma + lista[i].valorAbs,
+        [...caminho, lista[i].ref]
+      );
+      if (com) return com;
+
+      // não incluir
+      return backtrackBoleto(i + 1, soma, caminho);
+    }
+
+    const resultadoBoleto = backtrackBoleto(0, 0, []);
+
+    if (resultadoBoleto) {
+      resp.combinacaoCartao = resultadoBoleto;
+    }
+
+    return resp;
+  }
+
+
+  // ------------------------------
   // CASO: É CARTÃO
   // ------------------------------
   if (!dataOfx) return resp;
 
-  // Busca registros de até 7 dias
+  // Busca registros de até 5 dias
   const tsOfx = new Date(dataOfx).getTime();
 
   const itensDia = sistemaFiltradoPorTipo.filter(s => {
@@ -141,7 +294,7 @@ function buscarSugestoes(itemBanco) {
     const tsS = new Date(s.data).getTime();
     const diffDias = Math.abs(tsS - tsOfx) / (1000 * 60 * 60 * 24);
 
-    return diffDias <= 7;  // intervalo de 7 dias
+    return diffDiasUteis(s.data, dataOfx) <= 2;
   });
 
 
@@ -155,12 +308,14 @@ function buscarSugestoes(itemBanco) {
 
   // backtracking limitado para não travar o navegador
   function backtrack(i, soma, caminho) {
-    if (Math.abs(soma - valorOfxAbs) <= valorOfxAbs * 0.05) {
+    // aceita até -5% (soma <= valorOfxAbs e >= 95%)
+    if (soma <= valorOfxAbs && soma >= valorOfxAbs * 0.95) {
       return caminho;
     }
-    if (i >= lista.length || soma > valorOfxAbs * 1.10) {
+    if (i >= lista.length || soma > valorOfxAbs) {
       return null;
     }
+
 
     // incluir
     const com = backtrack(
@@ -200,6 +355,7 @@ function buscarSugestoesMultiplosBanco(itensBanco) {
     mesmoNome: [],
     combinacaoCartao: []
   };
+
 }
 
 
@@ -215,7 +371,14 @@ function mostrarPopupSugestoes(res) {
         <b>${titulo} (${lista.length})</b>
         <ul style="margin:6px 0 0 16px; padding:0;">
           ${lista.map(s => `
-            <li style="margin-bottom:6px;">
+            <li style="
+              margin-bottom:6px;
+              padding:6px;
+              border-radius:4px;
+              background:${s.conciliado ? '#e6f4ea' : 'transparent'};
+              color:${s.conciliado ? '#5dff82' : '#ffffffff'};
+            ">
+
               <b>Data:</b> ${formatDateBR(s.data)}<br>
               <b>Valor:</b> R$ ${Math.abs(Number(s.valor || 0)).toFixed(2)}<br>
               <b>Cliente:</b> ${s.cliente || "---"}<br>
@@ -229,9 +392,33 @@ function mostrarPopupSugestoes(res) {
 
   let html = "";
 
+  if (res.mesmoRemetente && res.mesmoRemetente.length > 1) {
+    html += `
+    <div style="margin-top:8px;">
+      <b>${res.mesmoRemetente.length} registros do mesmo remetente (OFX)</b>
+      <ul style="margin:6px 0 0 16px; padding:0;">
+        ${res.mesmoRemetente.map(b => `
+          <li style="
+            margin-bottom:6px;
+            padding:6px;
+            border-radius:4px;
+            background:${b.conciliado ? 'transparent' : 'transparent'};
+            color:${b.conciliado ? '#5dff82' : '#ffffffff'};
+          ">
+
+            <b>Data:</b> ${formatDateBR(b.date)}<br>
+            <b>Valor:</b> R$ ${Math.abs(Number(b.amount || 0)).toFixed(2)}
+          </li>
+        `).join("")}
+      </ul>
+    </div>
+  `;
+  }
+
+
   html += bloco("Mesmo Valor", res.mesmoValor);
   html += bloco("Mesma Data (valor aproximado)", res.mesmaData);
-  html += bloco("Mesmo Nome", res.mesmoNome);
+  html += bloco("Nome Semelhante", res.mesmoNome);
 
   if (res.combinacaoCartao && res.combinacaoCartao.length > 0) {
     html += bloco("Combinação Cartão", res.combinacaoCartao);
@@ -316,91 +503,100 @@ function deleteSystemFile(filename) {
 // ------------------------------------------------------------
 // CLASSIFICAÇÕES (OFX / SISTEMA)
 // ------------------------------------------------------------
+
+// =====================
+// TAG OFX — AUXILIAR (fallback / filtros antigos)
+// =====================
 function getCategoriaOfx(desc) {
-  const t = removerAcentos(String(desc || "").toLowerCase());
-
-  if (t.includes("pix") ||
-    t.includes("dep") || t.includes("deposit") || t.includes("dinheiro") ||
-    t.includes("transf") || t.includes("transfer") || t.includes("ted") || t.includes("doc"))
-    return "PIX";
-
-  if (t.includes("cartao") || t.includes("cred") || t.includes("visa") || t.includes("master"))
-    return "CARTAO";
-
-  if (t.includes("boleto"))
-    return "BOLETO";
-
-  return "OUTRO";
+  return detectPaymentTypeFromOfx(desc);
 }
 
+// =====================
+// COR TAG OFX
+// =====================
 function getBolaOfx(desc) {
-  const s = String(desc || "").toLowerCase();
-  const t = removerAcentos(s).replace(/\s+/g, ' ').trim();
-
-  if (t.includes('pix') ||
-    t.includes('dep ') || t.startsWith('dep.') || t.includes('deposito') || t.includes('deposit') ||
-    t.includes('dinheiro') ||
-    t.includes('transf') || t.includes('transferencia') || t.includes('ted') || t.includes('doc')) {
-    return paymentColor.PIX;
-  }
-
-  if (t.includes('cartao') || t.includes('cartão') || t.includes('carto') || t.includes('carte') ||
-    t.includes('crd') || t.includes('cred') || t.includes('credito') ||
-    t.includes('visa') || t.includes('master') || t.includes('elo') || t.includes('tef')) {
-    return paymentColor.CARTAO;
-  }
-
-  if (t.includes('boleto')) return paymentColor.BOLETO;
-
-  return paymentColor.OUTRO;
+  const cat = detectPaymentTypeFromOfx(desc);
+  return paymentColor[cat] || paymentColor.OUTRO;
 }
 
+// =====================
+// TAG SISTEMA
+// =====================
 function getCategoriaSistema(tipo) {
   const s = removerAcentos(String(tipo || "").toLowerCase());
 
-  if (s.includes("pix") || s.includes("dep") || s.includes("transfer") || s.includes("ted") || s.includes("doc"))
-    return "PIX";
-  if (s.includes("carto") || s.includes("crd") || s.includes("dbi"))
-    return "CARTAO";
-  if (s.includes("boleto"))
-    return "BOLETO";
+  // mantém compatibilidade com dados antigos do sistema
+  if (
+    s.includes("pix") ||
+    s.includes("dinheiro") ||
+    s.includes("transf") ||
+    s.includes("doc") ||
+    s.includes("ted")
+  ) return "PIX";
+
+  if (s.includes("cheque")) return "CHEQUE";
+
+  if (
+    s.includes("cartao") ||
+    s.includes("carto") ||
+    s.includes("credito") ||
+    s.includes("debito")
+  ) return "CARTAO";
+
+  if (s.includes("boleto") || s.includes("cobrana")) return "BOLETO";
+
+  if (s.includes("rendimento") || s.includes("rende")) return "RENDIMENTO";
 
   return "OUTRO";
 }
 
+// =====================
+// COR TAG SISTEMA
+// =====================
 function getBolaSistema(tipo) {
-  const s = String(tipo || "").toLowerCase();
-  const t = removerAcentos(s).replace(/\s+/g, ' ').trim();
-
-  if (t.includes('pix') ||
-    t.includes('dep') || t.includes('deposito') || t.includes('deposit') ||
-    t.includes('transf') || t.includes('transferencia') || t.includes('ted') || t.includes('doc'))
-    return paymentColor.PIX;
-
-  if (t.includes('cartao') || t.includes('cartão') || t.includes('carto') ||
-    t.includes('crd') || t.includes('cred') || t.includes('credito') ||
-    t.includes('debito') || t.includes('deb'))
-    return paymentColor.CARTAO;
-
-  if (t.includes('boleto')) return paymentColor.BOLETO;
-
-  if (t.includes('dinheiro') || t.includes('carteira')) return paymentColor.OUTRO;
-
-  return paymentColor.OUTRO;
+  const cat = getCategoriaSistema(tipo);
+  return paymentColor[cat] || paymentColor.OUTRO;
 }
 
-// detectPaymentTypeFromOfx mantém comportamento semelhante a getCategoriaOfx, mas retorna string de tipo para item OFX
+// =====================
+// TAG OFX
+// =====================
 function detectPaymentTypeFromOfx(desc) {
   if (!desc) return 'OUTRO';
   const t = removerAcentos(String(desc).toLowerCase());
 
-  if (t.includes('pix')) return 'PIX';
-  if (t.includes('cartao') || t.includes('carto') || t.includes('credito') || t.includes('debito')) return 'CARTAO';
-  if (t.includes('boleto') || t.includes('cobrana')) return 'BOLETO';
-  if (t.includes('transfer') || t.includes('dep') || t.includes('ted')) return 'TRANSFER';
+  // CARTÃO — mais específico primeiro
+  if (
+    t.includes("cartao") ||
+    t.includes("carto") ||
+    t.includes("credito") ||
+    t.includes("debito")
+  ) return "CARTAO";
 
-  return 'OUTRO';
+  // BOLETO
+  if (t.includes("boleto") || t.includes("cobrana"))
+    return "BOLETO";
+
+  // RENDIMENTO
+  if (t.includes("rendimento") || t.includes("rende"))
+    return "RENDIMENTO";
+
+  // PIX (inclui transf / dinheiro)
+  if (
+    t.includes("pix") ||
+    t.includes("dinheiro") ||
+    t.includes("transf") ||
+    t.includes("doc") ||
+    t.includes("ted")
+  ) return "PIX";
+
+  // CHEQUE
+  if (t.includes("cheque"))
+    return "CHEQUE";
+
+  return "OUTRO";
 }
+
 
 // ------------------------------------------------------------
 // PARSER OFX
@@ -408,6 +604,7 @@ function detectPaymentTypeFromOfx(desc) {
 function parseOFX(text, filename) {
   const items = [];
   const bankInfo = detectBankFromOfx(text, filename);
+  text = text.replace(/\u0000/g, "")
   text = text.replace(/\r/g, "\n");
   const parts = text.split(/<STMTTRN>/i);
 
@@ -794,37 +991,37 @@ function atualizarPainelDiferenca() {
   }
 
   p.innerHTML = `
-    <div style="font-size:18px; font-weight:bold; margin-bottom:6px;">
-      Diferença:
-      <span style="color:${Math.abs(dif) < 0.01 ? 'green' : 'red'};">
-        R$ ${dif.toFixed(2)}
-        </span> ${percStr}
-      </span>
-    </div>
+  <div style="font-size:18px; font-weight:bold; margin-bottom:6px;">
+    Diferença:
+    <span style="color:${Math.abs(dif) < 0.01 ? 'green' : 'red'};">
+      R$ ${dif.toFixed(2)}
+    </span> ${percStr}
+  </div>
 
-    <div style="font-size:14px; font-weight:normal; margin-top:4px;">
-      <b>Banco:</b> R$ ${somaBanco.toFixed(2)}
-    </div>
+  <div style="font-size:14px; font-weight:normal; margin-top:4px;">
+    <b>Banco (${selectedBanco.size}):</b> R$ ${somaBanco.toFixed(2)}
+  </div>
 
-    <div style="font-size:14px; font-weight:normal; margin-bottom:15px;">
-      <b>Sistema:</b> R$ ${somaSistema.toFixed(2)}
-    </div>
+  <div style="font-size:14px; font-weight:normal; margin-bottom:15px;">
+    <b>Sistema (${selectedSistema.size}):</b> R$ ${somaSistema.toFixed(2)}
+  </div>
 
-    <button id="btnConciliarFloat"
-      style="
-        width: 100%;
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        background: #4aa3ff;
-        color: #fff;
-        font-size: 14px;
-        font-weight: bold;
-      ">
-      Conciliar
-    </button>
-  `;
+  <button id="btnConciliarFloat"
+    style="
+      width: 100%;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #4aa3ff;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+    ">
+    Conciliar
+  </button>
+`;
+
 
   p.style.background = (Math.abs(dif) < 0.01) ? "#c7f7c7" : "#f7c7c7";
 
@@ -852,6 +1049,33 @@ function toggleDesativado(item) {
   renderList();
   atualizarTotais();
 }
+
+function toggleDesativadoSelecionadosOuUm(item) {
+  let alvos = [];
+
+  if (modoSelecaoAtivo) {
+    if (banco.includes(item)) {
+      alvos = banco.filter(b => selectedBanco.has(b.id));
+    } else {
+      alvos = sistema.filter(s => selectedSistema.has(s.id));
+    }
+  }
+
+  // fallback: só o item clicado
+  if (alvos.length === 0) {
+    alvos = [item];
+  }
+
+  alvos.forEach(it => {
+    it.desativado = !it.desativado;
+    selectedBanco.delete(it.id);
+    selectedSistema.delete(it.id);
+  });
+
+  renderList();
+  atualizarTotais();
+}
+
 
 // ------------------------------------------------------------
 // CONCILIAR MANUAL (apenas Sistema -> cria OFX falso)
@@ -907,23 +1131,27 @@ function conciliarManualSistema(itemSistema) {
   atualizarTotais();
 }
 
+function editarRegistroManual(item) {
+  if (!item || item.systemFileName !== "manual") return;
+
+  registroManualEmEdicao = item;
+
+  document.getElementById("m_data").value = item.data || "";
+  document.getElementById("m_valor").value = item.valor || "";
+  document.getElementById("m_cliente").value = item.cliente || "";
+  document.getElementById("m_nf").value = item.nf || "";
+
+  document.getElementById("modalAddManual").style.display = "flex";
+}
+
+
 window.conciliarManualSistema = conciliarManualSistema;
 
 // controle do menu de contexto
 let ctxTarget = null;
 const ctxMenu = document.getElementById("ctxMenu");
-const ctxToggle = document.getElementById("ctxToggle");
-
 // fechar menu ao clicar fora
 document.addEventListener("click", () => {
-  ctxMenu.style.display = "none";
-});
-
-// ação do botão no menu de contexto
-ctxToggle.addEventListener("click", () => {
-  if (!ctxTarget) return;
-
-  toggleDesativado(ctxTarget);
   ctxMenu.style.display = "none";
 });
 
@@ -1056,30 +1284,72 @@ function renderList() {
       if (ev.target.tagName === "SPAN") return;
       if (item.conciliado) return;
 
-      if (selectedBanco.has(item.id)) selectedBanco.delete(item.id);
-      else selectedBanco.add(item.id);
+      // =========================
+      // RECLIQUE → DESSELECIONA
+      // =========================
+      if (selectedBanco.has(item.id)) {
+        selectedBanco.delete(item.id);
+        div.classList.remove("selected");
 
-      // Fechar popup se não houver mais seleção
-      if (selectedBanco.size === 0) {
-        const popup = document.getElementById("popupSugestoes");
-        if (popup) popup.style.display = "none";
+        const selecionados = banco.filter(b => selectedBanco.has(b.id));
+
+        if (selecionados.length === 0) {
+          // nenhuma seleção → fecha popup
+          const popup = document.getElementById("popupSugestoes");
+          if (popup) popup.style.display = "none";
+        } else {
+          // ainda há seleção → recalcula popup
+          const res = selecionados.length === 1
+            ? buscarSugestoes(selecionados[0])
+            : buscarSugestoesMultiplosBanco(selecionados);
+
+          mostrarPopupSugestoes(res);
+        }
+
+        atualizarPainelDiferenca();
+        return;
       }
 
-      // Abrir/atualizar popup quando houver exatamente 1 item selecionado
-      if (selectedBanco.size === 1) {
-        const res = buscarSugestoes(item);
-        mostrarPopupSugestoes(res);
-      }
-      else if (selectedBanco.size > 1) {
-        const itens = banco.filter(b => selectedBanco.has(b.id));
-        const res = buscarSugestoesMultiplosBanco(itens);
-        mostrarPopupSugestoes(res);
+      // =========================
+      // MODO SELEÇÃO ATIVO
+      // =========================
+      if (modoSelecaoAtivo) {
+        selectedBanco.add(item.id);
+        div.classList.add("selected");
+
+        const selecionados = banco.filter(b => selectedBanco.has(b.id));
+
+        if (selecionados.length > 0) {
+          const res = selecionados.length === 1
+            ? buscarSugestoes(selecionados[0])
+            : buscarSugestoesMultiplosBanco(selecionados);
+
+          mostrarPopupSugestoes(res);
+        }
+
+        atualizarPainelDiferenca();
+        return;
       }
 
+      // =========================
+      // MODO NORMAL (troca)
+      // =========================
+      selectedBanco.clear();
+
+      // limpa visual anterior
+      document
+        .querySelectorAll("#listaBanco .item.selected")
+        .forEach(el => el.classList.remove("selected"));
+
+      selectedBanco.add(item.id);
+      div.classList.add("selected");
+
+      const res = buscarSugestoes(item);
+      mostrarPopupSugestoes(res);
 
       atualizarPainelDiferenca();
-      renderList();
     });
+
 
     div.addEventListener("contextmenu", ev => {
       ev.preventDefault();
@@ -1087,22 +1357,74 @@ function renderList() {
 
       ctxTarget = item;
 
-      // monta menu simples (apenas ativar / desativar)
+
+      // ===============================
+      // MENU DE CONTEXTO — SELEÇÃO / DESATIVAR
+      // ===============================
+
       ctxMenu.innerHTML = `
-        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">
-            ${item.desativado ? "Reativar" : "Desativar"}
+        ${!modoSelecaoAtivo ? `
+          <div id="ctxSel" style="padding:8px 12px; cursor:pointer;">
+            Abrir seleção
+          </div>
+        ` : `
+          <div id="ctxClearSel" style="padding:8px 12px; cursor:pointer;">
+            Limpar seleção
+          </div>
+        `}
+
+        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+          ${item.desativado ? "Reativar" : "Desativar"}
         </div>
-    `;
+      `;
 
       ctxMenu.style.left = ev.pageX + "px";
       ctxMenu.style.top = ev.pageY + "px";
       ctxMenu.style.display = "block";
 
-      // evento
+      // -------------------------------
+      // DESATIVAR / REATIVAR
+      // -------------------------------
       document.getElementById("ctxToggle").onclick = () => {
-        toggleDesativado(item);
+        toggleDesativadoSelecionadosOuUm(item);
         ctxMenu.style.display = "none";
       };
+
+      // -------------------------------
+      // ABRIR MODO SELEÇÃO
+      // -------------------------------
+      if (!modoSelecaoAtivo) {
+        document.getElementById("ctxSel").onclick = () => {
+          modoSelecaoAtivo = true;
+
+          // inicia seleção com o item clicado
+          if (banco.includes(item)) {
+            selectedBanco.add(item.id);
+          } else {
+            selectedSistema.add(item.id);
+          }
+
+          renderList();
+          atualizarPainelDiferenca();
+          ctxMenu.style.display = "none";
+        };
+      }
+
+      // -------------------------------
+      // LIMPAR SELEÇÃO
+      // -------------------------------
+      if (modoSelecaoAtivo) {
+        document.getElementById("ctxClearSel").onclick = () => {
+          modoSelecaoAtivo = false;
+          selectedBanco.clear();
+          selectedSistema.clear();
+
+          renderList();
+          atualizarPainelDiferenca();
+          ctxMenu.style.display = "none";
+        };
+      }
+
     });
 
 
@@ -1183,11 +1505,40 @@ function renderList() {
       if (ev.target.tagName === "SPAN") return;
       if (item.conciliado) return;
 
-      if (selectedSistema.has(item.id)) selectedSistema.delete(item.id);
-      else selectedSistema.add(item.id);
+      // =========================
+      // RECLIQUE → DESSELECIONA
+      // =========================
+      if (selectedSistema.has(item.id)) {
+        selectedSistema.delete(item.id);
+        div.classList.remove("selected");
+        atualizarPainelDiferenca();
+        return;
+      }
+
+      // =========================
+      // MODO SELEÇÃO ATIVO
+      // =========================
+      if (modoSelecaoAtivo) {
+        selectedSistema.add(item.id);
+        div.classList.add("selected");
+
+        atualizarPainelDiferenca();
+        return;
+      }
+
+      // =========================
+      // MODO NORMAL (troca)
+      // =========================
+      selectedSistema.clear();
+
+      document
+        .querySelectorAll("#listaSistema .item.selected")
+        .forEach(el => el.classList.remove("selected"));
+
+      selectedSistema.add(item.id);
+      div.classList.add("selected");
 
       atualizarPainelDiferenca();
-      renderList();
     });
 
 
@@ -1197,52 +1548,108 @@ function renderList() {
 
       ctxTarget = item;
 
-      // menu exclusivo do SISTEMA
+      const isManual = item.systemFileName === "manual";
+
+      // ===============================
+      // MENU DE CONTEXTO — SELEÇÃO / DESATIVAR
+      // ===============================
+
       ctxMenu.innerHTML = `
-        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer;">
-            ${item.desativado ? "Reativar" : "Desativar"}
+      ${!modoSelecaoAtivo ? `
+        <div id="ctxSel" style="padding:8px 12px; cursor:pointer;">
+          Abrir seleção
         </div>
+      ` : `
+        <div id="ctxClearSel" style="padding:8px 12px; cursor:pointer;">
+          Limpar seleção
+        </div>
+      `}
 
-        <div id="ctxManual" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+      <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+        ${item.desativado ? "Reativar" : "Desativar"}
+      </div>
+
+        ${item.systemFileName !== "manual" ? `
+          <div id="ctxManual" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
             Conciliar manual (Sistema → OFX)
-        </div>
-
-        <div id="ctxExcluir" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+          </div>
+        ` : `
+          <div id="ctxEditar" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+            Editar registro
+          </div>
+          <div id="ctxExcluir" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
             Excluir registro
-        </div>
-    `;
+          </div>
+        `}
+      `;
+
+      if (!modoSelecaoAtivo) {
+        document.getElementById("ctxSel").onclick = () => {
+          modoSelecaoAtivo = true;
+          selectedSistema.add(item.id);
+
+          // FEEDBACK VISUAL
+          div.classList.add("selected");
+
+          atualizarPainelDiferenca();
+          ctxMenu.style.display = "none";
+        };
+      }
+
+      // -------------------------------
+      // LIMPAR SELEÇÃO
+      // -------------------------------
+      if (modoSelecaoAtivo) {
+        document.getElementById("ctxClearSel").onclick = () => {
+          modoSelecaoAtivo = false;
+
+          selectedBanco.clear();
+          selectedSistema.clear();
+
+          // limpa visual imediatamente
+          document
+            .querySelectorAll(".item.selected")
+            .forEach(el => el.classList.remove("selected"));
+
+          atualizarPainelDiferenca();
+          ctxMenu.style.display = "none";
+        };
+      }
+
 
       ctxMenu.style.left = ev.pageX + "px";
       ctxMenu.style.top = ev.pageY + "px";
       ctxMenu.style.display = "block";
 
-      // DESATIVAR / REATIVAR
       document.getElementById("ctxToggle").onclick = () => {
-        toggleDesativado(item);
+        toggleDesativadoSelecionadosOuUm(item);
         ctxMenu.style.display = "none";
       };
 
-      // CONCILIAR MANUAL
-      document.getElementById("ctxManual").onclick = () => {
-        conciliarManualSistema(item);
-        ctxMenu.style.display = "none";
-      };
+      if (!isManual) {
+        document.getElementById("ctxManual").onclick = () => {
+          conciliarManualSistema(item);
+          ctxMenu.style.display = "none";
+        };
+      }
 
-      // EXCLUIR REGISTRO
-      document.getElementById("ctxExcluir").onclick = () => {
-        if (item.conciliado) {
-          alert("Este item está conciliado. Cancele a conciliação antes de excluir.");
-        } else {
-          const index = sistema.findIndex(s => s.id === item.id);
-          if (index > -1) {
-            sistema.splice(index, 1);
+      if (isManual) {
+        document.getElementById("ctxEditar").onclick = () => {
+          editarRegistroManual(item); // será implementado no PASSO 2
+          ctxMenu.style.display = "none";
+        };
+
+        document.getElementById("ctxExcluir").onclick = () => {
+          const idx = sistema.findIndex(s => s.id === item.id);
+          if (idx > -1) {
+            sistema.splice(idx, 1);
             renderList();
             atualizarTotais();
-            alert("Registro excluído com sucesso.");
+            alert("Registro manual excluído.");
           }
-        }
-        ctxMenu.style.display = "none";
-      };
+          ctxMenu.style.display = "none";
+        };
+      }
     });
 
 
@@ -1306,6 +1713,7 @@ function conciliar() {
 
   selectedBanco.clear();
   selectedSistema.clear();
+  modoSelecaoAtivo = false;
 
   renderList();
   alert("Itens conciliados!");
@@ -1384,6 +1792,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("btnCancelarManual")?.addEventListener("click", () => {
+    registroManualEmEdicao = null;
     modalAddManual.style.display = "none";
   });
 
@@ -1435,48 +1844,45 @@ document.addEventListener("DOMContentLoaded", () => {
     const data = document.getElementById("m_data").value;
     const valor = parseFloat(document.getElementById("m_valor").value || "0");
     const cliente = document.getElementById("m_cliente").value.trim();
-    const tipo = document.getElementById("m_tipo").value.trim();
-    const doc = document.getElementById("m_doc").value.trim();
     const nf = document.getElementById("m_nf").value.trim();
 
-    // validação simples
-    if (!data || !valor || !cliente || !tipo) {
-      alert("Preencha Data, Valor, Cliente e Tipo.");
+    if (!data || !valor || !cliente) {
+      alert("Preencha Data, Valor e Cliente.");
       return;
     }
 
-    const item = {
-      id: "manual_" + Date.now() + "_" + Math.floor(Math.random() * 99999),
+    // ===== MODO EDIÇÃO =====
+    if (registroManualEmEdicao) {
+      registroManualEmEdicao.data = data;
+      registroManualEmEdicao.valor = valor;
+      registroManualEmEdicao.cliente = cliente;
+      registroManualEmEdicao.nf = nf;
 
-      data,
-      valor,
-      cliente,
-      tipo,
-      doc,
-      nf,
+      registroManualEmEdicao = null;
+    }
+    // ===== MODO NOVO =====
+    else {
+      sistema.push({
+        id: "manual_" + Date.now() + "_" + Math.floor(Math.random() * 99999),
+        data,
+        valor,
+        cliente,
+        nf,
+        tipo: "Outros",
+        conciliado: false,
+        desativado: false,
+        fileKind: "manual",
+        systemFileName: "manual"
+      });
+    }
 
-      // campos automáticos
-      conciliado: false,
-      desativado: false,
-      fileKind: "manual",
-      systemFileName: "manual"
-    };
+    document.getElementById("modalAddManual").style.display = "none";
 
-    // adiciona ao array do sistema
-    sistema.push(item);
-
-    // fecha modal
-    modalAddManual.style.display = "none";
-
-    // limpa campos
     document.getElementById("m_data").value = "";
     document.getElementById("m_valor").value = "";
     document.getElementById("m_cliente").value = "";
-    document.getElementById("m_tipo").value = "";
-    document.getElementById("m_doc").value = "";
     document.getElementById("m_nf").value = "";
 
-    // atualiza UI
     renderList();
     atualizarTotais();
 
@@ -1668,6 +2074,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+
   ensurePainelDiferenca();
 });
-
