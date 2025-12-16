@@ -697,7 +697,7 @@ function parseMatricial(html, filename) {
   const COL_PAGTO = [480, 530];
   const COL_TIPO = [530, 600];
   const COL_VENDEDOR = [600, 700];
-  const COL_NF = [700, 800];
+  const COL_NF = [720, 760];
 
   function inside(x, r) { return x >= r[0] && x <= r[1]; }
 
@@ -770,7 +770,12 @@ function parseMatricial(html, filename) {
       }
       else if (inside(c.left, COL_TIPO)) atual.tipo = removerAcentos(txt);
       else if (inside(c.left, COL_VENDEDOR)) atual.vendedor = removerAcentos(txt);
-      else if (inside(c.left, COL_NF) && /^\d+$/.test(txt)) atual.nf = txt;
+      else if (inside(c.left, COL_NF) && atual.nf === null) {
+      const nfLimpa = txt.replace(/\D/g, "");
+        if (nfLimpa) {
+          atual.nf = nfLimpa;
+        }
+      }
     });
   });
 
@@ -2077,4 +2082,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
