@@ -375,7 +375,7 @@ function mostrarPopupSugestoes(res) {
               margin-bottom:6px;
               padding:6px;
               border-radius:4px;
-              background:${s.conciliado ? '#e6f4ea' : 'transparent'};
+              background:${s.conciliado ? 'transparent' : 'transparent'};
               color:${s.conciliado ? '#5dff82' : '#ffffffff'};
             ">
 
@@ -2077,3 +2077,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
