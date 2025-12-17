@@ -141,54 +141,75 @@
 </div>
 
 <script>
-/* Supabase Config */
-const { createClient } = window.supabase;
+    
+/* ============================
+   SUPABASE CONFIG (SEGURO)
+============================ */
 
 const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+// valida carregamento da lib
+if (!window.supabase || !window.supabase.createClient) {
+  alert("Erro ao carregar Supabase. Verifique a conexão.");
+  throw new Error("Supabase não carregado");
+}
+
+// cria cliente UMA VEZ
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON
+);
 
 const EMAIL_PERMITIDO = "cearasementes@gmail.com";
 
-/* LOGIN GOOGLE */
-async function loginGoogle() {
-    await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: window.location.href }
-    });
-}
+/* ============================
+   LOGIN GOOGLE
+============================ */
+window.loginGoogle = async function () {
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.href }
+  });
+};
 
-/* CARREGAR PAINEL */
+/* ============================
+   CARREGAR PAINEL
+============================ */
 async function carregarPainel() {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
 
-    if (!session) return;
+  if (!session) return;
 
-    const email = session.user.email;
+  const email = session.user.email;
 
-    if (email !== EMAIL_PERMITIDO) {
-        alert("Acesso negado.");
-        await supabase.auth.signOut();
-        return;
-    }
-
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("painelBox").style.display = "block";
-    document.getElementById("userEmail").innerText = email;
-}
-
-/* LOGOUT */
-async function logout() {
+  if (email !== EMAIL_PERMITIDO) {
+    alert("Acesso negado.");
     await supabase.auth.signOut();
-    location.reload();
+    return;
+  }
+
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("painelBox").style.display = "block";
+  document.getElementById("userEmail").innerText = email;
 }
 
-/* CHECK LOGIN AO ABRIR */
+/* ============================
+   LOGOUT
+============================ */
+window.logout = async function () {
+  await supabase.auth.signOut();
+  location.reload();
+};
+
+/* ============================
+   CHECK LOGIN AO ABRIR
+============================ */
 carregarPainel();
 </script>
 
 </body>
 </html>
+
 
