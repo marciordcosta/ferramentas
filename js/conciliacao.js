@@ -97,15 +97,23 @@ function normalizarNomeClienteOfx(str) {
   if (!str) return null;
 
   return removerAcentos(str)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\x20-\x7E]/g, "")
     .toLowerCase()
     .replace(/\b(pix|transfer|transf|dinheiro|pagamento|compra|debito|credito|cartao|boleto|cobranca|ref|id)\b/g, " ")
     .replace(/\d+/g, " ")
     .replace(/[^a-z\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+//Filtro no POPUP
+function filtrarPorDocumento(doc) {
+  if (!doc) return;
+
+  const input = document.getElementById("searchSistema");
+  if (!input) return;
+
+  input.value = doc;
+  renderList();
 }
 
 
@@ -187,11 +195,19 @@ function buscarSugestoes(itemBanco) {
   // ------------------------------
   if (tipoOfx !== "CARTAO") {
 
-    // 1) MESMO VALOR (exato, qualquer data)
-    resp.mesmoValor = sistemaFiltradoPorTipo.filter(s => {
+    // 1) MESMO VALOR
+    const mesmoValorTodos = sistemaFiltradoPorTipo.filter(s => {
       const v = Math.abs(Number(s.valor || 0));
       return v === valorOfxAbs;
     });
+
+    resp.mesmoValorMesmaData = mesmoValorTodos.filter(s =>
+      dataOfx && s.data === dataOfx
+    );
+
+    resp.mesmoValorOutraData = mesmoValorTodos.filter(s =>
+      !dataOfx || s.data !== dataOfx
+    );
 
     //COMPARA NOME OFX COM SISTEMA
     resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
@@ -377,7 +393,9 @@ function mostrarPopupSugestoes(res) {
               border-radius:4px;
               background:${s.conciliado ? 'transparent' : 'transparent'};
               color:${s.conciliado ? '#5dff82' : '#ffffffff'};
-            ">
+            "
+              onclick="filtrarPorDocumento('${safeIdForHtml(s.doc || "")}')"
+            >
 
               <b>Data:</b> ${formatDateBR(s.data)}<br>
               <b>Valor:</b> R$ ${Math.abs(Number(s.valor || 0)).toFixed(2)}<br>
@@ -416,8 +434,8 @@ function mostrarPopupSugestoes(res) {
   }
 
 
-  html += bloco("Mesmo Valor", res.mesmoValor);
-  html += bloco("Mesma Data (valor aproximado)", res.mesmaData);
+  html += bloco("Mesmo valor e mesma data", res.mesmoValorMesmaData);
+  html += bloco("Mesmo valor em outra data", res.mesmoValorOutraData);
   html += bloco("Nome Semelhante", res.mesmoNome);
 
   if (res.combinacaoCartao && res.combinacaoCartao.length > 0) {
@@ -459,19 +477,46 @@ function renderArquivosImportados() {
   boxSYS.innerHTML = sysHTML;
 }
 
+function renderFiltroArquivosOFX() {
+  const sel = document.getElementById("filterBanco");
+  if (!sel) return;
+
+  sel.innerHTML = `<option value="">Todos os arquivos</option>`;
+
+  arquivosOFX.forEach(nome => {
+    const opt = document.createElement("option");
+    opt.value = nome;
+    opt.textContent = nome;
+    opt.style.color = "#777";
+
+    sel.appendChild(opt);
+  });
+}
+
 // ------------------------------------------------------------
 // REMOVER ARQUIVOS (implementações centrais)
 // ------------------------------------------------------------
 function removerArquivoOFX(nome) {
   const nomeNorm = normalizeFileName(nome);
 
-  // remove registros do banco vinculados ao arquivo original
-  banco = banco.filter(x => normalizeFileName(x.ofxFileName) !== nomeNorm);
+  // remove registros do banco vinculados ao arquivo
+  banco = banco.filter(
+    x => normalizeFileName(x.ofxFileName) !== nomeNorm
+  );
 
-  // remove do array de arquivos importados
-  arquivosOFX = arquivosOFX.filter(f => f !== nomeNorm);
+  // remove do array de arquivos importados (nome REAL)
+  arquivosOFX = arquivosOFX.filter(
+    f => normalizeFileName(f) !== nomeNorm
+  );
+
+  // 🔑 RESETAR FILTRO SE APONTAR PARA O ARQUIVO REMOVIDO
+  const sel = document.getElementById("filterBanco");
+  if (sel && normalizeFileName(sel.value) === nomeNorm) {
+    sel.value = "";
+  }
 
   renderArquivosImportados();
+  renderFiltroArquivosOFX();
   renderList();
   atualizarTotais();
 }
@@ -528,7 +573,6 @@ function getCategoriaSistema(tipo) {
   // mantém compatibilidade com dados antigos do sistema
   if (
     s.includes("pix") ||
-    s.includes("dinheiro") ||
     s.includes("transf") ||
     s.includes("doc") ||
     s.includes("ted")
@@ -684,12 +728,30 @@ function parseMatricial(html, filename) {
   });
 
   const linhas = {};
-  itens.forEach(it => {
-    if (!linhas[it.top]) linhas[it.top] = [];
-    linhas[it.top].push(it);
-  });
+  let paginaAtual = 0;
 
+  let atual = null;
   const resultado = [];
+
+  itens.forEach(it => {
+
+    // DETECTA TEXTO "Página: X de Y"
+    if (/^pagina:\s*\d+/i.test(it.text)) {
+      paginaAtual++;
+      // >>> FECHA QUALQUER REGISTRO ABERTO AO VIRAR A PÁGINA <<<
+      if (atual && atual.valor !== null) {
+        resultado.push(atual);
+        atual = null;
+      }
+      return;
+    }
+
+
+    const key = paginaAtual + "_" + it.top;
+
+    if (!linhas[key]) linhas[key] = [];
+    linhas[key].push(it);
+  });
 
   const COL_CLIENTE = [70, 140];
   const COL_DOC = [140, 200];
@@ -723,12 +785,13 @@ function parseMatricial(html, filename) {
   // rótulo final
   const fileKindLabel = isPagar ? "Saída" : "Entrada";
 
-
-  let atual = null;
   let idx = 0;
 
-  Object.keys(linhas).sort((a, b) => a - b).forEach(top => {
-    const cols = linhas[top];
+  Object.keys(linhas).forEach(key => {
+    let clienteLinha = null;
+    let docLinha = null;
+
+    const cols = linhas[key];
 
     cols.forEach(c => {
       const txt = c.text;
@@ -746,8 +809,8 @@ function parseMatricial(html, filename) {
           id: `${filename || 'SIST'}_${idx++}`,
           systemFileName: filename || '',
           fileKind: fileKindLabel,
-          cliente: null,
-          doc: null,
+          cliente: clienteLinha,
+          doc: docLinha,
           valor: (isPagar ? -1 : 1) * parseFloat(txt.replace(/\./g, "").replace(/,/g, ".")),
           data: null,
           nf: null,
@@ -762,8 +825,8 @@ function parseMatricial(html, filename) {
 
       if (!atual) return;
 
-      if (inside(c.left, COL_CLIENTE)) atual.cliente = removerAcentos(txt);
-      else if (inside(c.left, COL_DOC)) atual.doc = txt;
+      if (inside(c.left, COL_CLIENTE)) clienteLinha = removerAcentos(txt);
+      else if (inside(c.left, COL_DOC)) docLinha = removerAcentos(txt);
       else if (inside(c.left, COL_PAGTO) && /^\d{2}\/\d{2}\/\d{4}$/.test(txt)) {
         const [d, m, y] = txt.split("/");
         atual.data = `${y}-${m}-${d}`;
@@ -771,7 +834,7 @@ function parseMatricial(html, filename) {
       else if (inside(c.left, COL_TIPO)) atual.tipo = removerAcentos(txt);
       else if (inside(c.left, COL_VENDEDOR)) atual.vendedor = removerAcentos(txt);
       else if (inside(c.left, COL_NF) && atual.nf === null) {
-      const nfLimpa = txt.replace(/\D/g, "");
+        const nfLimpa = txt.replace(/\D/g, "");
         if (nfLimpa) {
           atual.nf = nfLimpa;
         }
@@ -804,7 +867,9 @@ function applyFilters() {
   const f = getFilterValues();
 
   const bancoFiltered = banco.filter(b => {
-    if (f.bank && b.bank !== f.bank) return false;
+    if (f.bank && normalizeFileName(b.ofxFileName) !== normalizeFileName(f.bank)) {
+      return false;
+    }
 
     if (f.tipo) {
       const cat = getCategoriaOfx(b.desc);
@@ -967,8 +1032,22 @@ function ensurePainelDiferenca() {
   return p;
 }
 
+function contarOfxNaoConciliados() {
+  let total = 0;
+
+  banco.forEach(b => {
+    if (b.desativado) return;
+    if (b.conciliado) return;
+    total++;
+  });
+
+  return total;
+}
+
+
 function atualizarPainelDiferenca() {
   const p = ensurePainelDiferenca();
+  const totalOfxNaoConciliados = contarOfxNaoConciliados();
 
   const somaBanco = banco
     .filter(x => selectedBanco.has(x.id) && !x.desativado)
@@ -1009,6 +1088,9 @@ function atualizarPainelDiferenca() {
 
   <div style="font-size:14px; font-weight:normal; margin-bottom:15px;">
     <b>Sistema (${selectedSistema.size}):</b> R$ ${somaSistema.toFixed(2)}
+    <div style="font-size:11px; color:#666; margin-top:2px;">
+      ${totalOfxNaoConciliados} Não conciliados
+    </div>
   </div>
 
   <button id="btnConciliarFloat"
@@ -1137,12 +1219,12 @@ function conciliarManualSistema(itemSistema) {
 }
 
 function editarRegistroManual(item) {
-  if (!item || item.systemFileName !== "manual") return;
+  if (!item) return;
 
   registroManualEmEdicao = item;
 
   document.getElementById("m_data").value = item.data || "";
-  document.getElementById("m_valor").value = item.valor || "";
+  document.getElementById("m_valor").value = Math.abs(Number(item.valor || 0));
   document.getElementById("m_cliente").value = item.cliente || "";
   document.getElementById("m_nf").value = item.nf || "";
 
@@ -1155,6 +1237,7 @@ window.conciliarManualSistema = conciliarManualSistema;
 // controle do menu de contexto
 let ctxTarget = null;
 const ctxMenu = document.getElementById("ctxMenu");
+
 // fechar menu ao clicar fora
 document.addEventListener("click", () => {
   ctxMenu.style.display = "none";
@@ -1570,18 +1653,23 @@ function renderList() {
         </div>
       `}
 
-      <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
-        ${item.desativado ? "Reativar" : "Desativar"}
-      </div>
+        <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+          ${item.desativado ? "Reativar" : "Desativar"}
+        </div>
+
+        <div
+          id="ctxEditar"
+            style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;"
+              onclick="editarRegistroManual(ctxTarget); document.getElementById('ctxMenu').style.display='none';"
+            >
+          Editar registro
+        </div>
 
         ${item.systemFileName !== "manual" ? `
           <div id="ctxManual" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
             Conciliar manual (Sistema → OFX)
           </div>
         ` : `
-          <div id="ctxEditar" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
-            Editar registro
-          </div>
           <div id="ctxExcluir" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
             Excluir registro
           </div>
@@ -1621,7 +1709,6 @@ function renderList() {
         };
       }
 
-
       ctxMenu.style.left = ev.pageX + "px";
       ctxMenu.style.top = ev.pageY + "px";
       ctxMenu.style.display = "block";
@@ -1639,11 +1726,6 @@ function renderList() {
       }
 
       if (isManual) {
-        document.getElementById("ctxEditar").onclick = () => {
-          editarRegistroManual(item); // será implementado no PASSO 2
-          ctxMenu.style.display = "none";
-        };
-
         document.getElementById("ctxExcluir").onclick = () => {
           const idx = sistema.findIndex(s => s.id === item.id);
           if (idx > -1) {
@@ -1656,7 +1738,6 @@ function renderList() {
         };
       }
     });
-
 
     ls?.appendChild(div);
   });
@@ -1940,7 +2021,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (adicionadosPorArquivo > 0) {
             totalAdicionadosNestaOperacao += adicionadosPorArquivo;
-            arquivosOFX.push(nomeNorm); // só registra arquivo se trouxe algo novo
+            arquivosOFX.push(f.name);
           }
 
         } catch (e) {
@@ -2001,6 +2082,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("htmlFile").value = "";
 
       renderArquivosImportados();
+      renderFiltroArquivosOFX();
       renderList();
       atualizarTotais();
 
@@ -2049,6 +2131,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (htmlInput) htmlInput.value = "";
 
       renderArquivosImportados();
+      renderFiltroArquivosOFX();
       renderList();
       atualizarTotais();
 
@@ -2072,6 +2155,7 @@ document.addEventListener("DOMContentLoaded", () => {
       arquivosSYS = Array.isArray(data.arquivosSYS) ? data.arquivosSYS : [];
 
       renderArquivosImportados();
+      renderFiltroArquivosOFX();
       renderList();
       atualizarTotais();
     } catch (e) {
@@ -2079,8 +2163,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-
   ensurePainelDiferenca();
 });
-
-
