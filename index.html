@@ -1,215 +1,220 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel de Ferramentas</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Ferramentas</title>
 
-<!-- Supabase v2 -->
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Supabase v2 -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #e6e7e8;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        padding-top: 50px;
-        margin: 0;
-    }
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #e6e7e8;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 50px;
+            margin: 0;
+        }
 
-    /* CONTAINER CENTRAL */
-    .container {
-        background: white;
-        padding: 30px;
-        border-radius: 14px;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.10);
-        width: 90%;
-        max-width: 650px;
-        text-align: center;
-    }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+            width: 90%;
+            max-width: 650px;
+            text-align: center;
+        }
 
-    h1 {
-        margin-bottom: 25px;
-        color: #222;
-    }
+        h1 {
+            margin-bottom: 25px;
+            color: #222;
+        }
 
-    /* GRID DE BOTÕES */
-    .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 18px;
-        margin-top: 25px;
-    }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-top: 25px;
+        }
 
-    /* BOTÕES */
-    a.button {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        padding: 18px 12px;
-        background: #d9dadc;
-        color: #111;
-        text-decoration: none;
-        border-radius: 12px;
-        font-weight: bold;
-        font-size: 16px;
-        transition: transform 0.2s, background 0.3s;
-        border: 1px solid #c5c6c7;
-    }
+        a.button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 18px 12px;
+            background: #d9dadc;
+            color: #111;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 16px;
+            transition: transform 0.2s, background 0.3s;
+            border: 1px solid #c5c6c7;
+        }
 
-    a.button:hover {
-        transform: translateY(-2px);
-        background: #c4c5c6;
-    }
+        a.button:hover {
+            transform: translateY(-2px);
+            background: #c4c5c6;
+        }
 
-    /* LOGIN */
-    .google-btn {
-        background: white;
-        color: #444;
-        border: 1px solid #ccc;
-        padding: 12px;
-        font-size: 16px;
-        border-radius: 10px;
-        width: 100%;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        font-weight: bold;
-    }
-    .google-btn img {
-        width: 22px;
-        height: 22px;
-    }
-    .google-btn:hover {
-        background: #f0f0f0;
-    }
+        .google-btn {
+            background: white;
+            color: #444;
+            border: 1px solid #ccc;
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 10px;
+            width: 100%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-weight: bold;
+        }
 
-    .email-logado {
-        margin-bottom: 10px;
-        font-size: 14px;
-        color: #333;
-    }
-    .sair {
-        color: red;
-        margin-bottom: 20px;
-        display: block;
-        cursor: pointer;
-        font-weight: bold;
-    }
+        .google-btn img {
+            width: 22px;
+            height: 22px;
+        }
 
-</style>
+        .google-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .email-logado {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .sair {
+            color: red;
+            margin-bottom: 20px;
+            display: block;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div class="container" id="loginBox">
-    <h1>Acessar sistema</h1>
+    <!-- LOGIN -->
+    <div class="container" id="loginBox">
+        <h1>Acessar sistema</h1>
 
-    <button class="google-btn" onclick="loginGoogle()">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg">
-        Entrar com Google
-    </button>
-</div>
-
-<!-- PAINEL -->
-<div class="container" id="painelBox" style="display:none;">
-    <h1>Painel de Ferramentas</h1>
-
-    <div class="email-logado" id="userEmail"></div>
-    <a class="sair" onclick="logout()">sair</a>
-
-    <div class="grid">
-
-        <a href="pix.html" class="button"><i class="fa-solid fa-qrcode"></i> PIX</a>
-        <a href="frete.html" class="button"><i class="fa-solid fa-truck-fast"></i> Frete</a>
-        <a href="sintegra.html" class="button"><i class="fa-solid fa-file-invoice"></i> Sintegra</a>
-        <a href="gerenciador.html" class="button"><i class="fa-solid fa-folder-open"></i> Gerenciador</a>
-        <a href="conciliacao.html" class="button" style="background:#f4d06f;">
-            <i class="fa-solid fa-calculator"></i> Conciliação
-        </a>
-
+        <button class="google-btn" id="btnLoginGoogle">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg">
+            Entrar com Google
+        </button>
     </div>
 
-</div>
+    <!-- PAINEL -->
+    <div class="container" id="painelBox" style="display:none;">
+        <h1>Painel de Ferramentas</h1>
 
-<script>
-    
-/* ============================
-   SUPABASE CONFIG (SEGURO)
+        <div class="email-logado" id="userEmail"></div>
+        <a class="sair" onclick="logout()">sair</a>
+
+        <div class="grid">
+            <a href="pix.html" class="button"><i class="fa-solid fa-qrcode"></i> PIX</a>
+            <a href="frete.html" class="button"><i class="fa-solid fa-truck-fast"></i> Frete</a>
+            <a href="rastreio.html" class="button"><i class="fa-solid fa-location-dot"></i> Rastreio</a>
+            <a href="sintegra.html" class="button"><i class="fa-solid fa-file-invoice"></i> Sintegra</a>
+            <a href="gerenciador.html" class="button"><i class="fa-solid fa-folder-open"></i> Gerenciador</a>
+            <a href="conciliacao.html" class="button" style="background:#f4d06f;">
+                <i class="fa-solid fa-calculator"></i> Conciliação
+            </a>
+        </div>
+    </div>
+
+    <script>
+        /* ============================
+   SUPABASE CONFIG
 ============================ */
+        const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
+        const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk";
 
-const SUPABASE_URL = "https://wnmtkoywbbzolbkoawva.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXRrb3l3YmJ6b2xia29hd3ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzQ2NzgsImV4cCI6MjA3NzkxMDY3OH0.-FQZhh8Kbugfv4Dl-vAZXKcVnfzJXG1HK45PRkGmDmk";
+        if (!window.supabase || !window.supabase.createClient) {
+            alert("Erro ao carregar Supabase.");
+            throw new Error("Supabase não carregado");
+        }
 
-// valida carregamento da lib
-if (!window.supabase || !window.supabase.createClient) {
-  alert("Erro ao carregar Supabase. Verifique a conexão.");
-  throw new Error("Supabase não carregado");
-}
+        const supabase = window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON
+        );
 
-// cria cliente UMA VEZ
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON
-);
+        const EMAIL_PERMITIDO = "cearasementes@gmail.com";
 
-const EMAIL_PERMITIDO = "cearasementes@gmail.com";
+        /* ============================
+           LOGIN GOOGLE
+        ============================ */
+        function loginGoogle() {
+            supabase.auth.signInWithOAuth({
+                provider: "google",
+                options: { redirectTo: window.location.href }
+            });
+        }
 
-/* ============================
-   LOGIN GOOGLE
-============================ */
-window.loginGoogle = async function () {
-  await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.href }
-  });
-};
+        /* ============================
+           LISTENER OAUTH
+        ============================ */
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "SIGNED_IN" && session) {
+                carregarPainel();
+            }
+        });
 
-/* ============================
-   CARREGAR PAINEL
-============================ */
-async function carregarPainel() {
-  const { data } = await supabase.auth.getSession();
-  const session = data.session;
+        /* ============================
+           CARREGAR PAINEL
+        ============================ */
+        async function carregarPainel() {
+            const { data } = await supabase.auth.getSession();
+            const session = data.session;
+            if (!session) return;
 
-  if (!session) return;
+            const email = session.user.email;
+            if (email !== EMAIL_PERMITIDO) {
+                alert("Acesso negado.");
+                await supabase.auth.signOut();
+                return;
+            }
 
-  const email = session.user.email;
+            document.getElementById("loginBox").style.display = "none";
+            document.getElementById("painelBox").style.display = "block";
+            document.getElementById("userEmail").innerText = email;
+        }
 
-  if (email !== EMAIL_PERMITIDO) {
-    alert("Acesso negado.");
-    await supabase.auth.signOut();
-    return;
-  }
+        /* ============================
+           LOGOUT
+        ============================ */
+        function logout() {
+            supabase.auth.signOut().then(() => location.reload());
+        }
 
-  document.getElementById("loginBox").style.display = "none";
-  document.getElementById("painelBox").style.display = "block";
-  document.getElementById("userEmail").innerText = email;
-}
+        /* ============================
+           CHECK LOGIN AO ABRIR
+        ============================ */
+        supabase.auth.getSession().then(() => carregarPainel());
 
-/* ============================
-   LOGOUT
-============================ */
-window.logout = async function () {
-  await supabase.auth.signOut();
-  location.reload();
-};
+        /* ============================
+           BIND DO BOTÃO (SEM onclick)
+        ============================ */
+        const btnLogin = document.getElementById("btnLoginGoogle");
+        if (btnLogin) {
+            btnLogin.addEventListener("click", loginGoogle);
+        }
 
-/* ============================
-   CHECK LOGIN AO ABRIR
-============================ */
-carregarPainel();
-</script>
-
-</body>
-</html>
-
-
+        </script>
+    </body >
+</html >
