@@ -301,39 +301,34 @@ function buscarSugestoes(itemBanco) {
   // ------------------------------
   if (!dataOfx) return resp;
 
-  // Busca registros de até 5 dias
-  const tsOfx = new Date(dataOfx).getTime();
-
+  // busca registros em janela de dias úteis
   const itensDia = sistemaFiltradoPorTipo.filter(s => {
     if (!s.data) return false;
-
-    const tsS = new Date(s.data).getTime();
-    const diffDias = Math.abs(tsS - tsOfx) / (1000 * 60 * 60 * 24);
-
     return diffDiasUteis(s.data, dataOfx) <= 2;
   });
 
+  // candidatos válidos (regra do cartão)
+  const lista = itensDia
+    .map(s => ({
+      ref: s,
+      valorAbs: Math.abs(Number(s.valor || 0))
+    }))
+    .filter(x =>
+      x.valorAbs >= valorOfxAbs &&        // sistema nunca menor que OFX
+      x.valorAbs <= valorOfxAbs * 1.05    // até +5%
+    )
+    .sort((a, b) => b.valorAbs - a.valorAbs);
 
-  const lista = itensDia.map(s => ({
-    ref: s,
-    valorAbs: Math.abs(Number(s.valor || 0))
-  }));
-
-  // ordenar por valor desc para ajudar a combinação
-  lista.sort((a, b) => b.valorAbs - a.valorAbs);
-
-  // backtracking limitado para não travar o navegador
+  // backtracking correto
   function backtrack(i, soma, caminho) {
-    // aceita até -5% (soma <= valorOfxAbs e >= 95%)
-    if (soma <= valorOfxAbs && soma >= valorOfxAbs * 0.95) {
+    if (soma >= valorOfxAbs && soma <= valorOfxAbs * 1.05) {
       return caminho;
     }
-    if (i >= lista.length || soma > valorOfxAbs) {
+
+    if (i >= lista.length || soma > valorOfxAbs * 1.05) {
       return null;
     }
 
-
-    // incluir
     const com = backtrack(
       i + 1,
       soma + lista[i].valorAbs,
@@ -341,7 +336,6 @@ function buscarSugestoes(itemBanco) {
     );
     if (com) return com;
 
-    // não incluir
     return backtrack(i + 1, soma, caminho);
   }
 
@@ -396,7 +390,6 @@ function mostrarPopupSugestoes(res) {
             "
               onclick="filtrarPorDocumento('${safeIdForHtml(s.doc || "")}')"
             >
-
               <b>Data:</b> ${formatDateBR(s.data)}<br>
               <b>Valor:</b> R$ ${Math.abs(Number(s.valor || 0)).toFixed(2)}<br>
               <b>Cliente:</b> ${s.cliente || "---"}<br>
@@ -990,6 +983,7 @@ function cancelarConciliacao(chave) {
 
       b.conciliado = false;
       delete b.parChave;
+      delete b.nfs;
       delete b.nf;
       delete b.cliente;
       delete b.doc;
@@ -1782,7 +1776,13 @@ function conciliar() {
     selectedSistema.forEach(idSistema => {
       const s = sistema.find(x => x.id === idSistema);
       if (b && s) {
-        b.nf = s.nf;
+        if (!b.nfs) b.nfs = [];
+
+        if (s.nf && !b.nfs.includes(s.nf)) {
+          b.nfs.push(s.nf);
+        }
+
+        b.nf = b.nfs.join(", ");
         b.cliente = s.cliente;
         b.tipo = s.tipo || s.payment_type;
         b.doc = s.doc;
@@ -2162,6 +2162,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Erro ao restaurar dados salvos", e);
     }
   }
+
 
   ensurePainelDiferenca();
 });
