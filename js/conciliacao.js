@@ -75,23 +75,28 @@ function removerAcentos(str) {
     .replace(/[^a-zA-Z0-9\s]/g, "");
 }
 
-function diffDiasUteis(dataA, dataB) {
-  let d1 = new Date(dataA);
-  let d2 = new Date(dataB);
+function diffDiasUteis(dataSistema, dataOfx) {
+  let d1 = new Date(dataSistema);
+  let d2 = new Date(dataOfx);
 
-  if (d1 > d2) [d1, d2] = [d2, d1];
+  let sinal = 1;
+  if (d1 > d2) {
+    sinal = -1; // sistema depois do OFX
+    [d1, d2] = [d2, d1];
+  }
 
   let dias = 0;
   const cur = new Date(d1);
 
-  while (cur <= d2) {
-    const dia = cur.getDay();
-    if (dia !== 0 && dia !== 6) dias++; // ignora sábado e domingo
+  while (cur < d2) {
     cur.setDate(cur.getDate() + 1);
+    const dia = cur.getDay();
+    if (dia !== 0 && dia !== 6) dias++;
   }
 
-  return dias - 1; // não conta o próprio dia
+  return dias * sinal;
 }
+
 
 function normalizarNomeClienteOfx(str) {
   if (!str) return null;
@@ -248,104 +253,150 @@ function buscarSugestoes(itemBanco) {
   if (tipoOfx === "BOLETO") {
     if (!dataOfx) return resp;
 
-    const tsOfx = new Date(dataOfx).getTime();
-    const janelaDias = 2;
+    const vOfx = Number(itemBanco.amount || 0);
 
     const itensDia = sistema.filter(s => {
       if (!s.data) return false;
       if (getCategoriaSistema(s.tipo) !== "BOLETO") return false;
-      return diffDiasUteis(s.data, dataOfx) <= 2;
+
+      const vSys = Number(s.valor || 0);
+
+      // ✔ respeita sinal (entrada / saída)
+      if (vOfx > 0 && vSys <= 0) return false;
+      if (vOfx < 0 && vSys >= 0) return false;
+
+      if (s.data > dataOfx) return false;
+
+      let dSys = new Date(s.data);
+      let dOfx = new Date(dataOfx);
+
+      let diasUteis = 0;
+      const cur = new Date(dSys);
+
+      while (cur < dOfx) {
+        cur.setDate(cur.getDate() + 1);
+        const dia = cur.getDay();
+        if (dia !== 0 && dia !== 6) diasUteis++;
+        if (diasUteis > 3) return false;
+      }
+
+      return true;
     });
 
-    const lista = itensDia.map(s => ({
-      ref: s,
-      valorAbs: Math.abs(Number(s.valor || 0))
-    }));
+    // ------------------------------
+    // 1) VALOR EXATO (PRIORIDADE)
+    // ------------------------------
+    const valorExato = itensDia.filter(s =>
+      Math.abs(Number(s.valor || 0)) === valorOfxAbs
+    );
 
-    // ordenar por valor desc
-    lista.sort((a, b) => b.valorAbs - a.valorAbs);
-
-    function backtrackBoleto(i, soma, caminho) {
-      // valor EXATO
-      if (soma === valorOfxAbs) {
-        return caminho;
-      }
-      if (i >= lista.length || soma > valorOfxAbs) {
-        return null;
-      }
-
-      // incluir
-      const com = backtrackBoleto(
-        i + 1,
-        soma + lista[i].valorAbs,
-        [...caminho, lista[i].ref]
-      );
-      if (com) return com;
-
-      // não incluir
-      return backtrackBoleto(i + 1, soma, caminho);
+    if (valorExato.length > 0) {
+      resp.mesmoValorMesmaData = valorExato;
+      return resp;
     }
 
-    const resultadoBoleto = backtrackBoleto(0, 0, []);
+    // ------------------------------
+    // 2) SOMA DE VALORES (MESMA DATA)
+    // ------------------------------
+    const porData = {};
 
-    if (resultadoBoleto) {
-      resp.combinacaoCartao = resultadoBoleto;
+    itensDia.forEach(s => {
+      if (!porData[s.data]) porData[s.data] = [];
+      porData[s.data].push(s);
+    });
+
+    for (const data in porData) {
+      const lista = porData[data]
+        .map(s => ({
+          ref: s,
+          valorAbs: Math.abs(Number(s.valor || 0))
+        }))
+        .sort((a, b) => b.valorAbs - a.valorAbs);
+
+      function backtrack(i, soma, caminho) {
+        if (soma === valorOfxAbs) return caminho;
+        if (i >= lista.length || soma > valorOfxAbs) return null;
+
+        const com = backtrack(
+          i + 1,
+          soma + lista[i].valorAbs,
+          [...caminho, lista[i].ref]
+        );
+        if (com) return com;
+
+        return backtrack(i + 1, soma, caminho);
+      }
+
+      const resultado = backtrack(0, 0, []);
+
+      if (resultado) {
+        resp.combinacaoCartao = resultado;
+        return resp;
+      }
     }
 
     return resp;
   }
 
-
   // ------------------------------
   // CASO: É CARTÃO
   // ------------------------------
-  if (!dataOfx) return resp;
+  if (tipoOfx === "CARTAO") {
+    if (!dataOfx) return resp;
 
-  // busca registros em janela de dias úteis
-  const itensDia = sistemaFiltradoPorTipo.filter(s => {
-    if (!s.data) return false;
-    return diffDiasUteis(s.data, dataOfx) <= 2;
-  });
+    const subtipoOfx = getSubtipoCartaoOfx(itemBanco.desc);
+    if (!subtipoOfx) return resp;
 
-  // candidatos válidos (regra do cartão)
-  const lista = itensDia
-    .map(s => ({
-      ref: s,
-      valorAbs: Math.abs(Number(s.valor || 0))
-    }))
-    .filter(x =>
-      x.valorAbs >= valorOfxAbs &&        // sistema nunca menor que OFX
-      x.valorAbs <= valorOfxAbs * 1.05    // até +5%
-    )
-    .sort((a, b) => b.valorAbs - a.valorAbs);
+    let minPerc = 0;
+    let maxPerc = 0;
 
-  // backtracking correto
-  function backtrack(i, soma, caminho) {
-    if (soma >= valorOfxAbs && soma <= valorOfxAbs * 1.05) {
-      return caminho;
+    if (subtipoOfx === "DEBITO") {
+      minPerc = 0.009; // 0,9%
+      maxPerc = 0.03;  // 3,0%
+    } else if (subtipoOfx === "CREDITO") {
+      minPerc = 0.019; // 1,9%
+      maxPerc = 0.05;  // 5,0%
     }
 
-    if (i >= lista.length || soma > valorOfxAbs * 1.05) {
-      return null;
-    }
+    const candidatos = sistemaFiltradoPorTipo.filter(s => {
+      if (!s.data) return false;
 
-    const com = backtrack(
-      i + 1,
-      soma + lista[i].valorAbs,
-      [...caminho, lista[i].ref]
+      const subtipoSys = getSubtipoCartaoSistema(s.tipo);
+      if (subtipoSys !== subtipoOfx) return false;
+
+      // ❌ nunca depois do OFX
+      if (s.data > dataOfx) return false;
+
+      // até 2 dias úteis antes
+      const diff = diffDiasUteis(s.data, dataOfx);
+      if (diff > 2) return false;
+
+      const vSys = Math.abs(Number(s.valor || 0));
+      if (vSys < valorOfxAbs) return false;
+
+      const perc = (vSys - valorOfxAbs) / vSys;
+      if (perc < minPerc) return false;
+      if (perc > maxPerc) return false;
+
+      return true;
+    });
+
+    // mesma data primeiro
+    resp.mesmoValorMesmaData = candidatos.filter(s =>
+      s.data === dataOfx
     );
-    if (com) return com;
 
-    return backtrack(i + 1, soma, caminho);
+    if (resp.mesmoValorMesmaData.length > 0) {
+      return resp;
+    }
+
+    // outras datas válidas
+    resp.mesmoValorOutraData = candidatos.filter(s =>
+      s.data !== dataOfx
+    );
+
+    return resp;
   }
-
-  const resultado = backtrack(0, 0, []);
-
-  if (resultado) {
-    resp.combinacaoCartao = resultado;
-  }
-
-  return resp;
 }
 
 function buscarSugestoesMultiplosBanco(itensBanco) {
@@ -391,7 +442,8 @@ function mostrarPopupSugestoes(res) {
               onclick="filtrarPorDocumento('${safeIdForHtml(s.doc || "")}')"
             >
               <b>Data:</b> ${formatDateBR(s.data)}<br>
-              <b>Valor:</b> R$ ${Math.abs(Number(s.valor || 0)).toFixed(2)}<br>
+              <b>Valor:</b> R$ ${Math.abs(Number(s.valor || 0)).toFixed(2)}
+              ${s.taxa_percentual ? ` (${getSubtipoCartaoSistema(s.tipo)} ${s.taxa_percentual.toFixed(2)}%)` : ``}<br>
               <b>Cliente:</b> ${s.cliente || "---"}<br>
               <b>DOC:</b> ${s.doc || "---"} — <b>NF:</b> ${s.nf || "---"}
             </li>
@@ -550,6 +602,21 @@ function getCategoriaOfx(desc) {
 }
 
 // =====================
+// SUBTIPO CARTÃO (OFX)
+// =====================
+function getSubtipoCartaoOfx(desc) {
+  if (!desc) return null;
+
+  const t = removerAcentos(String(desc).toLowerCase());
+
+  if (t.includes("debito")) return "DEBITO";
+  if (t.includes("credito")) return "CREDITO";
+
+  return null;
+}
+
+
+// =====================
 // COR TAG OFX
 // =====================
 function getBolaOfx(desc) {
@@ -585,6 +652,20 @@ function getCategoriaSistema(tipo) {
   if (s.includes("rendimento") || s.includes("rende")) return "RENDIMENTO";
 
   return "OUTRO";
+}
+
+// =====================
+// SUBTIPO CARTÃO (SISTEMA)
+// =====================
+function getSubtipoCartaoSistema(tipo) {
+  if (!tipo) return null;
+
+  const t = removerAcentos(String(tipo).toLowerCase());
+
+  if (t.includes("dbi")) return "DEBITO";
+  if (t.includes("crd")) return "CREDITO";
+
+  return null;
 }
 
 // =====================
@@ -819,7 +900,7 @@ function parseMatricial(html, filename) {
       if (!atual) return;
 
       if (inside(c.left, COL_CLIENTE)) clienteLinha = removerAcentos(txt);
-      else if (inside(c.left, COL_DOC)) docLinha = removerAcentos(txt);
+      else if (inside(c.left, COL_DOC)) docLinha = txt.trim();
       else if (inside(c.left, COL_PAGTO) && /^\d{2}\/\d{2}\/\d{4}$/.test(txt)) {
         const [d, m, y] = txt.split("/");
         atual.data = `${y}-${m}-${d}`;
@@ -998,12 +1079,26 @@ function cancelarConciliacao(chave) {
   }
 
   // remover conciliação do sistema
+  let taxaParaReverter = 0;
+
   sistema.forEach(s => {
     if (s.parChave === chave) {
+      if (s.taxa_valor > 0) {
+        taxaParaReverter += s.taxa_valor;
+      }
+
       s.conciliado = false;
       delete s.parChave;
     }
   });
+
+  // ===== REVERTER TAXA CARTÃO =====
+  if (taxaParaReverter > 0) {
+    const regTaxa = sistema.find(x => x.id === "AUTO_TAXA_CARTAO");
+    if (regTaxa) {
+      regTaxa.valor = +(Number(regTaxa.valor || 0) + taxaParaReverter).toFixed(2);
+    }
+  }
 
   renderList();
   atualizarTotais();
@@ -1364,7 +1459,12 @@ function renderList() {
 
     div.addEventListener("click", ev => {
       if (ev.target.tagName === "SPAN") return;
-      if (item.conciliado) return;
+      // permite abrir popup mesmo conciliado (somente visualização)
+      if (item.conciliado) {
+        const res = buscarSugestoes(item);
+        mostrarPopupSugestoes(res);
+        return;
+      }
 
       // =========================
       // RECLIQUE → DESSELECIONA
@@ -1529,6 +1629,23 @@ function renderList() {
     const semNF = !item.nf;
     const semStyle = semNF ? 'border-left:4px solid #dc3545; background:#fff5f5;' : '';
 
+    let percTotalTaxa = "";
+
+    if (item.id === "AUTO_TAXA_CARTAO") {
+      const totalBrutoCartao = sistema
+        .filter(s =>
+          s.conciliado &&
+          getCategoriaSistema(s.tipo) === "CARTAO" &&
+          s.taxa_valor > 0
+        )
+        .reduce((t, s) => t + Math.abs(Number(s.valor || 0)), 0);
+
+      if (totalBrutoCartao > 0) {
+        const perc = (Math.abs(item.valor) / totalBrutoCartao) * 100;
+        percTotalTaxa = ` (${perc.toFixed(2)}%)`;
+      }
+    }
+
     div.innerHTML = `
       ${xBtn}
 
@@ -1537,7 +1654,12 @@ function renderList() {
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
 
           <b style="color:${item.valor < 0 ? 'red' : '#000'};">
-            R$ ${(item.valor < 0 ? '-' : '') + Math.abs(Number(item.valor || 0)).toFixed(2)}
+            R$ ${(item.valor < 0 ? '-' : '') + Math.abs(Number(item.valor || 0)).toFixed(2)}${percTotalTaxa}
+            ${item.taxa_valor > 0 ? `
+              <span style="font-size:11px; color:#666; margin-left:6px;">
+                (−R$ ${item.taxa_valor.toFixed(2)} | ${item.taxa_percentual.toFixed(2)}%)
+              </span>
+        ` : ``}
           </b>
 
           — ${formatDateBR(item.data)}
@@ -1788,6 +1910,45 @@ function conciliar() {
         b.doc = s.doc;
         b.dataSistema = s.data;
 
+        // ===== TAXA CARTÃO (SISTEMA) =====
+        if ((b.payment_type || "").toUpperCase() === "CARTAO") {
+          const valorOfx = Math.abs(Number(b.amount || 0));
+          const valorSys = Math.abs(Number(s.valor || 0));
+
+          if (valorSys > 0 && valorSys >= valorOfx) {
+            s.taxa_valor = +(valorSys - valorOfx).toFixed(2);
+            s.taxa_percentual = +((s.taxa_valor / valorSys) * 100).toFixed(2);
+          } else {
+            s.taxa_valor = 0;
+            s.taxa_percentual = 0;
+          }
+        }
+
+        // ===== ACUMULADOR AUTOMÁTICO DE TAXA DE CARTÃO =====
+        if ((b.payment_type || "").toUpperCase() === "CARTAO" && s.taxa_valor > 0) {
+
+          let regTaxa = sistema.find(x => x.id === "AUTO_TAXA_CARTAO");
+
+          if (!regTaxa) {
+            regTaxa = {
+              id: "AUTO_TAXA_CARTAO",
+              systemFileName: "automatico",
+              fileKind: "Saída",
+              tipo: "Taxa Cartão",
+              cliente: "Administradora de Cartão",
+              doc: "TAXA_CARTAO",
+              nf: "",
+              data: s.data || b.date || new Date().toISOString().slice(0, 10),
+              valor: -s.taxa_valor,
+              conciliado: true,
+              desativado: false
+            };
+            sistema.push(regTaxa);
+          } else {
+            regTaxa.valor = +(Number(regTaxa.valor || 0) - s.taxa_valor).toFixed(2);
+          }
+        }
+
         b.conciliado = true;
         s.conciliado = true;
 
@@ -1807,7 +1968,6 @@ function conciliar() {
   // fechar popup de sugestões após conciliar
   const popup = document.getElementById("popupSugestoes");
   if (popup) popup.style.display = "none";
-
 }
 
 // ------------------------------------------------------------
@@ -1866,7 +2026,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("popupSugestoesClose").onclick = () => {
     document.getElementById("popupSugestoes").style.display = "none";
   };
-
 
   // ------------------------------
   // BOTÃO + → ABRIR MODAL MANUAL
@@ -2029,7 +2188,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-
       const htmlInput = document.getElementById("htmlFile");
       const htmlFiles = htmlInput ? Array.from(htmlInput.files) : [];
 
@@ -2162,7 +2320,6 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Erro ao restaurar dados salvos", e);
     }
   }
-
 
   ensurePainelDiferenca();
 });
