@@ -17,6 +17,7 @@
 =========================== */
     .painel-horizontal {
       display: flex;
+      margin-top: 25px;
       gap: 25px;
       padding: 18px;
       border: 1px solid #d0d0d0;
@@ -58,8 +59,7 @@
     .titulo-filtro {
       font-size: 15px;
       font-weight: bold;
-      margin-bottom: 6px;
-      padding-bottom: 4px;
+      margin-bottom: 2px;
       border-bottom: 1px solid #ccc;
       width: 100%;
     }
@@ -97,7 +97,7 @@
 
     .col-upload button,
     .btnFiltro {
-      margin-top: 8px;
+      margin-top: 15px;
       width: 90px;
       padding: 3px;
       font-size: 13px;
@@ -115,6 +115,10 @@
       margin-top: 6px;
       align-items: center;
     }
+
+    .painel-oculto {
+      display: none;
+    } 
 
     /* ===========================
    LISTAGEM / PAINÉIS LADO A LADO
@@ -324,55 +328,6 @@
       margin-left: 5px;
     }
 
-    .fullscreen-mode {
-      position: fixed !important;
-      top: 0;
-      left: 0;
-      width: 100vw !important;
-      height: auto;
-      background: #fff;
-      padding: 10px;
-      margin: 0 !important;
-      z-index: 99999;
-      overflow: auto;
-    }
-
-    .hide-on-fullscreen {
-      display: none !important;
-    }
-
-    #fullscreenConciliarBtn {
-      display: none;
-      position: fixed;
-      top: 75px;
-      right: 10px;
-      padding: 5px 10px;
-      font-size: 14px;
-      border-radius: 10px;
-      background: #5fc2ff;
-      color: #ffffff;
-      cursor: pointer;
-      z-index: 100000;
-    }
-
-    #expandToggle {
-      position: fixed;
-      top: 32px;
-      right: 37px;
-      font-size: 22px;
-      cursor: pointer;
-      z-index: 99999;
-      padding: 4px 6px;
-    }
-
-    #expandToggle.fullscreen-icon {
-      position: fixed;
-      top: 0px;
-      right: 10px;
-      font-size: 22px;
-      z-index: 100001;
-    }
-
     .searchbox {
       width: 300px;
       padding: 8px;
@@ -527,24 +482,30 @@
 
 <body>
 
-  <a href="index.html" style="
-    position: absolute;
-    top: 0;
-    right: 25px;
-    font-size: 14px;
-    color: #555;
-    text-decoration: none;
-    padding: 6px 10px;
-    border-radius: 6px;
-">
-    ← voltar
-  </a>
-
+  <div style="
+    position:absolute;
+    top:5px;
+    right:25px;
+    font-size:14px;
+    color:#bfbfbf;
+  ">
+    <a href="index.html" style="color:#ff0000; text-decoration:none;">
+      Sair
+    </a>
+    <span> | </span>
+    <a href="#" id="togglePainel" style="
+      color:#919191;
+      text-decoration:none;
+      cursor:pointer;
+    ">
+      Ocultar painel
+    </a>
+  </div>
 
   <div id="painelDiferenca">Diferença: R$ 0,00</div>
 
   <!-- ====== UPLOADS ====== -->
-  <div class="painel-horizontal">
+  <div class="painel-horizontal" id="painelTopo">
 
     <!-- COLUNA 1 — UPLOADS -->
     <div class="col-upload">
@@ -601,6 +562,16 @@
         </select>
       </div>
 
+      <div class="fLinha">
+        <label>Conciliação:</label>
+        <select id="filterConciliado">
+          <option value="">Todos</option>
+          <option value="sim">Conciliados</option>
+          <option value="nao">Não conciliados</option>
+          <option value="marcados">Marcados</option>
+        </select>
+      </div>
+
       <!-- CORREÇÃO: botões dentro do container de botões -->
       <div class="linha-filtros-botoes">
         <button id="aplicarFiltros" class="btnFiltro">Filtrar</button>
@@ -628,8 +599,6 @@
 
 
   </div>
-
-  <div id="expandToggle" title="Expandir/Restaurar">⛶</div>
 
   <!-- LISTA DE ARQUIVOS IMPORTADOS -->
   <div class="painel-arquivos">
@@ -769,54 +738,25 @@
     </div>
   </div>
 
-  <script src="js/conciliacao.js"></script>
-
-  <button id="fullscreenConciliarBtn">Conciliar</button>
-
   <script>
     document.addEventListener("DOMContentLoaded", () => {
+      const painel = document.getElementById("painelTopo");
+      const btn = document.getElementById("togglePainel");
 
-      const toggle = document.getElementById("expandToggle");
-      const container = document.querySelector(".container");
-      const middleBtn = document.getElementById("btnConciliar");
-      const fullBtn = document.getElementById("fullscreenConciliarBtn");
+      if (!painel || !btn) return;
 
-      let isFull = false;
+      let visivel = true;
 
-      toggle.addEventListener("click", () => {
-        isFull = !isFull;
+      btn.addEventListener("click", () => {
+        visivel = !visivel;
 
-        if (isFull) {
-
-          container.classList.add("fullscreen-mode");
-          toggle.classList.add("fullscreen-icon");
-
-          document.querySelectorAll(".title")
-            .forEach(t => t.classList.add("fixed-header"));
-
-          middleBtn.style.display = "none";
-          fullBtn.style.display = "block";
-
-        } else {
-
-          container.classList.remove("fullscreen-mode");
-          toggle.classList.remove("fullscreen-icon");
-
-          document.querySelectorAll(".title")
-            .forEach(t => t.classList.add("fixed-header"));
-
-          middleBtn.style.display = "block";
-          fullBtn.style.display = "none";
-        }
+        painel.classList.toggle("painel-oculto", !visivel);
+        btn.textContent = visivel ? "Ocultar painel" : "Mostrar painel";
       });
-
-      fullBtn.addEventListener("click", () => {
-        document.getElementById("btnConciliar").click();
-      });
-
     });
   </script>
 
+  <script src="js/conciliacao.js"></script>
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
@@ -1001,4 +941,3 @@
 </body>
 
 </html>
-
