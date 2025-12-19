@@ -183,6 +183,7 @@ function limparFiltroDocumentoSistema() {
   input.value = "";
 }
 
+// ---- FIM UTILITARIOS ---- //
 
 function buscarSugestoes(itemBanco) {
   const nomeNormalizadoBase = normalizarNomeClienteOfx(itemBanco.desc);
@@ -2488,4 +2489,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
