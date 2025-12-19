@@ -110,6 +110,61 @@ function normalizarNomeClienteOfx(str) {
     .trim();
 }
 
+function nomesSemelhantesFortes(nomeOfx, nomeSys) {
+  if (!nomeOfx || !nomeSys) return false;
+
+  const a = nomeOfx.trim();
+  const b = nomeSys.trim();
+
+  // REGRA 1 — um contém o outro (nome quase completo)
+  if (a.length >= 8 && b.includes(a)) return true;
+  if (b.length >= 8 && a.includes(b)) return true;
+
+  const pa = a.split(" ");
+  const pb = b.split(" ");
+
+  if (pa.length === 0 || pb.length < 2) return false;
+
+  const primeiroA = pa[0];
+  const primeiroB = pb[0];
+
+  // primeiro nome deve bater
+  if (primeiroA !== primeiroB) return false;
+
+  // OFX: "francisco l"
+  if (pa.length === 2 && pa[1].length === 1) {
+    const inicial = pa[1];
+    const sobrenomeSys = pb[1];
+
+    if (
+      sobrenomeSys &&
+      sobrenomeSys.length >= 5 &&
+      sobrenomeSys.startsWith(inicial)
+    ) {
+      return true;
+    }
+  }
+
+  // fallback: últimas 2 palavras com prefixo forte
+  if (pa.length >= 2 && pb.length >= 2) {
+    const caudaA = pa.slice(-2).join(" ");
+    const caudaB = pb.slice(-2).join(" ");
+
+    if (
+      caudaA.length >= 6 &&
+      caudaB.startsWith(caudaA.slice(0, 6))
+    ) return true;
+
+    if (
+      caudaB.length >= 6 &&
+      caudaA.startsWith(caudaB.slice(0, 6))
+    ) return true;
+  }
+
+  return false;
+}
+
+
 //Filtro no POPUP
 function filtrarPorDocumento(doc) {
   if (!doc) return;
@@ -185,12 +240,10 @@ function buscarSugestoes(itemBanco) {
 
     if (nomeOfx) {
       resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
-        const cli = removerAcentos(String(s.cliente || "").toLowerCase());
-        if (!cli) return false;
+        const nomeSys = removerAcentos(String(s.cliente || "").toLowerCase());
+        if (!nomeSys) return false;
 
-        return nomeOfx.split(" ").some(p =>
-          p.length >= 4 && cli.includes(p)
-        );
+        return nomesSemelhantesFortes(nomeOfx, nomeSys);
       });
     }
   }
@@ -400,23 +453,74 @@ function buscarSugestoes(itemBanco) {
 }
 
 function buscarSugestoesMultiplosBanco(itensBanco) {
+
+  if (!itensBanco || itensBanco.length < 2) {
+    return {
+      mesmoValor: [],
+      mesmaData: [],
+      mesmoNome: [],
+      combinacaoCartao: []
+    };
+  }
+
+  // regra válida somente para PIX
+  const tipo = (itensBanco[0].payment_type || "").toUpperCase();
+  if (tipo !== "PIX") {
+    return {
+      mesmoValor: [],
+      mesmaData: [],
+      mesmoNome: [],
+      combinacaoCartao: []
+    };
+  }
+
+  // soma absoluta dos OFX
   const somaTotal = itensBanco.reduce(
     (t, b) => t + Math.abs(Number(b.amount || 0)),
     0
   );
 
+  // sinal (entrada / saída)
+  const sinalOfx = Math.sign(Number(itensBanco[0].amount || 0));
+
+  // data base (primeiro OFX)
+  const dataBase = itensBanco[0].date;
+
+  // candidatos no sistema
   const candidatos = sistema.filter(s => {
+
+    // tipo PIX
+    if (getCategoriaSistema(s.tipo) !== "PIX") return false;
+
+    // sinal compatível
+    if (Math.sign(Number(s.valor || 0)) !== sinalOfx) return false;
+
+    // valor exato (soma)
     const v = Math.abs(Number(s.valor || 0));
-    return v === somaTotal;
+    if (v !== somaTotal) return false;
+
+    return true;
   });
 
+  // mesma data primeiro
+  const mesmaData = candidatos.filter(s => s.data === dataBase);
+
+  if (mesmaData.length > 0) {
+    return {
+      mesmoValorMesmaData: mesmaData,
+      mesmoValorOutraData: [],
+      mesmoNome: [],
+      combinacaoCartao: []
+    };
+  }
+
+  // fallback: outras datas
   return {
-    mesmoValor: candidatos,
-    mesmaData: [],
+    mesmoValorMesmaData: [],
+    mesmoValorOutraData: candidatos,
     mesmoNome: [],
     combinacaoCartao: []
   };
-
 }
 
 
@@ -754,7 +858,8 @@ function parseOFX(text, filename) {
       desc,
       payment_type,
       conciliado: false,
-      desativado: false
+      desativado: false,
+      marcado: false
     });
   }
 
@@ -933,7 +1038,8 @@ function getFilterValues() {
     start: document.getElementById('filterDataInicio')?.value || '',
     end: document.getElementById('filterDataFim')?.value || '',
     tipo: document.getElementById('filterTipo')?.value || '',
-    kind: document.getElementById('filterKind')?.value || ''
+    kind: document.getElementById('filterKind')?.value || '',
+    conciliado: document.getElementById('filterConciliado')?.value || ''
   };
 }
 
@@ -960,6 +1066,10 @@ function applyFilters() {
       if (Number(b.amount) >= 0) return false;
     }
 
+    if (f.conciliado === "sim" && !b.conciliado) return false;
+    if (f.conciliado === "nao" && b.conciliado) return false;
+    if (f.conciliado === "marcados" && !b.marcado) return false;
+
     return true;
   });
 
@@ -970,6 +1080,9 @@ function applyFilters() {
     if (f.kind === "pagar") {
       if (Number(s.valor) >= 0) return false;
     }
+
+    if (f.conciliado === "sim" && !s.conciliado) return false;
+    if (f.conciliado === "nao" && s.conciliado) return false;
 
     if (f.tipo) {
       const cat = getCategoriaSistema(s.tipo);
@@ -992,6 +1105,7 @@ document.getElementById("limparFiltros")?.addEventListener("click", () => {
   document.getElementById("filterKind").value = "";
   document.getElementById("filterDataInicio").value = "";
   document.getElementById("filterDataFim").value = "";
+  document.getElementById("filterConciliado").value = "";
 
   renderList();
   atualizarTotais();
@@ -1360,24 +1474,39 @@ function renderList() {
   const textoSistema = (document.getElementById("searchSistema")?.value || "").toLowerCase();
 
   const bancoFinal = bancoFiltered.filter(item => {
+
     if (!textoBanco) return true;
+
+    const termo = textoBanco;
+
+    const valorExibido = Math.abs(Number(item.amount || 0)).toFixed(2);
+    const dataExibida = formatDateBR(item.date);
+
     return (
-      String(Math.abs(item.amount)).includes(textoBanco) ||
-      String(item.desc || "").toLowerCase().includes(textoBanco) ||
-      String(item.nf || "").toLowerCase().includes(textoBanco) ||
-      String(item.doc || "").toLowerCase().includes(textoBanco) ||
-      String(item.cliente || "").toLowerCase().includes(textoBanco)
+      valorExibido.includes(termo) ||
+      dataExibida.includes(termo) ||
+      String(item.desc || "").toLowerCase().includes(termo) ||
+      String(item.nf || "").toLowerCase().includes(termo) ||
+      String(item.doc || "").toLowerCase().includes(termo) ||
+      String(item.cliente || "").toLowerCase().includes(termo)
     );
   });
 
   const sistemaFinal = sistemaFiltered.filter(item => {
+
     if (!textoSistema) return true;
+
+    const termo = textoSistema.toLowerCase();
+    const valorExibido = Math.abs(Number(item.valor || 0)).toFixed(2);
+    const dataExibida = formatDateBR(item.data);
+
     return (
-      String(Math.abs(item.valor)).includes(textoSistema) ||
-      String(item.cliente || "").toLowerCase().includes(textoSistema) ||
-      String(item.tipo || "").toLowerCase().includes(textoSistema) ||
-      String(item.nf || "").toLowerCase().includes(textoSistema) ||
-      String(item.doc || "").toLowerCase().includes(textoSistema)
+      valorExibido.includes(termo) ||
+      dataExibida.includes(termo) ||
+      String(item.cliente || "").toLowerCase().includes(termo) ||
+      String(item.tipo || "").toLowerCase().includes(termo) ||
+      String(item.nf || "").toLowerCase().includes(termo) ||
+      String(item.doc || "").toLowerCase().includes(termo)
     );
   });
 
@@ -1405,7 +1534,7 @@ function renderList() {
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
 
           <b style="color:${item.amount < 0 ? 'red' : '#000'};">
-            ${formatMoney(item.amount)}
+            R$ ${formatarContabil(item.amount)}
           </b>
 
           — ${formatDateBR(item.date)}
@@ -1432,7 +1561,7 @@ function renderList() {
             ${(item.bankName || item.ofxFileName || '---').toUpperCase()}
           </span>
 
-            ${String(item.id).startsWith("FAKE_") ? `
+          ${String(item.id).startsWith("FAKE_") ? `
             <span style="
               padding:2px 6px;
               font-size:11px;
@@ -1443,6 +1572,19 @@ function renderList() {
             ">
               MANUAL
             </span>` : ``}
+
+          ${item.marcado ? `
+            <span style="
+              padding:2px 6px;
+              font-size:11px;
+              border-radius:6px;
+              background:#ff9800;
+              color:#000;
+              font-weight:bold;
+            ">
+              MARCADO
+            </span>
+          ` : ``}
 
         </div>
 
@@ -1555,6 +1697,10 @@ function renderList() {
           </div>
         `}
 
+        <div id="ctxMarcar" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+          ${item.marcado ? "Desmarcar" : "Marcar"}
+        </div>
+
         <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
           ${item.desativado ? "Reativar" : "Desativar"}
         </div>
@@ -1563,6 +1709,15 @@ function renderList() {
       ctxMenu.style.left = ev.pageX + "px";
       ctxMenu.style.top = ev.pageY + "px";
       ctxMenu.style.display = "block";
+
+      // -------------------------------
+      // DESMARCAR / MARCAR
+      // -------------------------------
+      document.getElementById("ctxMarcar").onclick = () => {
+        item.marcado = !item.marcado;
+        renderList();
+        ctxMenu.style.display = "none";
+      };
 
       // -------------------------------
       // DESATIVAR / REATIVAR
@@ -1689,8 +1844,8 @@ function renderList() {
         </div>
 
         <div style="font-size:13px;margin-top:2px;color:#444;">
-          ${item.cliente || '---'} — 
-          ${item.tipo || '---'} — 
+          ${item.cliente || '---'} —
+          ${item.tipo || '---'} —
           ${item.doc || '---'}
         </div>
 
@@ -1950,6 +2105,7 @@ function conciliar() {
         }
 
         b.conciliado = true;
+        b.marcado = false;
         s.conciliado = true;
 
         b.parChave = chave;
