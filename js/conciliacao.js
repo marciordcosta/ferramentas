@@ -176,6 +176,13 @@ function filtrarPorDocumento(doc) {
   renderList();
 }
 
+function limparFiltroDocumentoSistema() {
+  const input = document.getElementById("searchSistema");
+  if (!input) return;
+
+  input.value = "";
+}
+
 
 function buscarSugestoes(itemBanco) {
   const nomeNormalizadoBase = normalizarNomeClienteOfx(itemBanco.desc);
@@ -2118,6 +2125,8 @@ function conciliar() {
   selectedSistema.clear();
   modoSelecaoAtivo = false;
 
+  limparFiltroDocumentoSistema();
+
   renderList();
   alert("Itens conciliados!");
 
@@ -2479,3 +2488,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
