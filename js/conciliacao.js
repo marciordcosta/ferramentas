@@ -1106,6 +1106,26 @@ function applyFilters() {
   return { bancoFiltered, sistemaFiltered };
 }
 
+
+function aplicarAutoFiltros() {
+  renderList();
+  atualizarTotais();
+}
+
+[
+  "filterBanco",
+  "filterTipo",
+  "filterKind",
+  "filterConciliado",
+  "filterDataInicio",
+  "filterDataFim"
+].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("change", aplicarAutoFiltros);
+});
+
+
 // limpar filtros (liga ao elemento somente quando presente)
 document.getElementById("limparFiltros")?.addEventListener("click", () => {
   document.getElementById("filterBanco").value = "";
@@ -2185,7 +2205,6 @@ async function saveStateToServer() {
 document.addEventListener("DOMContentLoaded", () => {
   const processBtn = document.getElementById("processBtn");
   const conciliarBtn = document.getElementById("btnConciliar");
-  const aplicarFiltrosBtn = document.getElementById("aplicarFiltros");
   const btnExportarTopo = document.getElementById("btnExportarTopo");
   const btnSalvarTopo = document.getElementById("btnSalvarTopo");
 
@@ -2415,7 +2434,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (conciliarBtn) conciliarBtn.addEventListener("click", conciliar);
-  if (aplicarFiltrosBtn) aplicarFiltrosBtn.addEventListener("click", renderList);
 
   if (btnExportarTopo) {
     btnExportarTopo.addEventListener("click", () => {
@@ -2489,5 +2507,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
-
-
