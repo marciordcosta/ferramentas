@@ -42,21 +42,23 @@
     }
 
     .col-upload input[type="file"] {
-      margin-bottom: 12px;
       font-size: 13px;
       color: #a3a3a3;
     }
 
     /* FILTROS */
     .col-filtros {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 30px;
+      row-gap: 4px;
       padding-top: 4px;
       min-width: 360px;
+      align-items: start;
     }
 
     .titulo-filtro {
+      grid-column: 1 / -1;
       font-size: 15px;
       font-weight: bold;
       margin-bottom: 2px;
@@ -75,6 +77,16 @@
       font-size: 14px;
     }
 
+    .fLinha-lateral {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 6px;
+      grid-column: 2;
+      grid-row: 2 / span 3;
+      align-self: stretch;
+    }
+
     .linha-filtros-botoes {
       display: flex !important;
       flex-direction: row !important;
@@ -86,6 +98,9 @@
       background: #ffe4c0 !important;
     }
 
+    .col-filtros select {
+      min-width: 124px;
+    }
 
     .col-filtros select,
     .col-filtros input[type="date"] {
@@ -97,7 +112,6 @@
 
     .col-upload button,
     .btnFiltro {
-      margin-top: 15px;
       width: 90px;
       padding: 3px;
       font-size: 13px;
@@ -118,7 +132,7 @@
 
     .painel-oculto {
       display: none;
-    } 
+    }
 
     /* ===========================
    LISTAGEM / PAINÉIS LADO A LADO
@@ -155,6 +169,7 @@
 
     /* bloco de duas datas */
     .bloco-datas {
+      grid-column: 1;
       flex-direction: column;
       align-items: flex-start;
       gap: 4px;
@@ -167,7 +182,7 @@
     }
 
     .linha-data-fim {
-      margin-top: -2px;
+      margin-top: -4px;
     }
 
     /* coluna dos botões Exportar / Salvar */
@@ -183,7 +198,7 @@
     /* botões topo */
     .btn-acao-topo {
       padding: 5px 10px;
-      border-radius: 2px;
+      border-radius: 8px;
       color: white;
       border: none;
       font-size: 14px;
@@ -357,7 +372,7 @@
    RODAPÉ / PAINEL DIFERENÇA
 =========================== */
     #painelDiferenca {
-      top: 210px;
+      top: 160px;
       right: 40px;
       /* posição inicial */
       left: auto;
@@ -514,68 +529,70 @@
 
       <label class="titulo-filtro">Filtros</label>
 
-      <div class="fLinha">
-        <label>Arquivo:</label>
-        <select id="filterBanco">
-          <option value="">Todos os arquivos</option>
-        </select>
-      </div>
-
-      <div class="fLinha bloco-datas">
-        <div class="linha-data">
-          <label>Data início:</label>
-          <input type="date" id="filterDataInicio">
+      <!-- COLUNA ESQUERDA -->
+      <div class="filtros-col">
+        <div class="fLinha">
+          <label>Arquivo:</label>
+          <select id="filterBanco"></select>
         </div>
 
-        <div class="linha-data linha-data-fim">
-          <label>Data fim:</label>
-          <input type="date" id="filterDataFim">
+        <div class="fLinha bloco-datas">
+          <div class="linha-data">
+            <label>Data início:</label>
+            <input type="date" id="filterDataInicio">
+          </div>
+          <div class="linha-data linha-data-fim">
+            <label>Data fim:</label>
+            <input type="date" id="filterDataFim">
+          </div>
         </div>
       </div>
 
-      <div class="fLinha">
-        <label>Forma Pagto:</label>
-        <select id="filterTipo">
-          <option value="">Todos</option>
-          <option value="PIX">PIX</option>
-          <option value="CARTAO">Cartão</option>
-          <option value="BOLETO">Boleto</option>
-          <option value="OUTRO">Outro</option>
-        </select>
+      <!-- COLUNA DIREITA -->
+      <div class="filtros-col">
+        <div class="fLinha">
+          <label>Forma Pagto:</label>
+          <select id="filterTipo">
+            <option value="">Todos</option>
+            <option value="PIX">PIX</option>
+            <option value="CARTAO">Cartão</option>
+            <option value="BOLETO">Boleto</option>
+            <option value="OUTRO">Outro</option>
+          </select>
+
+        </div>
+
+        <div class="fLinha">
+          <label>Tipo Relatório:</label>
+          <select id="filterKind">
+            <option value="">Todos</option>
+            <option value="receber">Entrada</option>
+            <option value="pagar">Saída</option>
+          </select>
+        </div>
+
+        <div class="fLinha">
+          <label>Conciliação:</label>
+          <select id="filterConciliado">
+            <option value="">Todos</option>
+            <option value="sim">Conciliados</option>
+            <option value="nao">Não conciliados</option>
+            <option value="marcados">Marcados</option>
+          </select>
+        </div>
+
       </div>
 
-      <div class="fLinha">
-        <label>Tipo Relatório:</label>
-        <select id="filterKind">
-          <option value="">Todos</option>
-          <option value="receber">Entrada</option>
-          <option value="pagar">Saída</option>
-        </select>
-      </div>
-
-      <div class="fLinha">
-        <label>Conciliação:</label>
-        <select id="filterConciliado">
-          <option value="">Todos</option>
-          <option value="sim">Conciliados</option>
-          <option value="nao">Não conciliados</option>
-          <option value="marcados">Marcados</option>
-        </select>
-      </div>
-
-      <!-- CORREÇÃO: botões dentro do container de botões -->
       <div class="linha-filtros-botoes">
-        <button id="aplicarFiltros" class="btnFiltro">Filtrar</button>
         <button id="limparFiltros" class="btnFiltro btnCinza">Limpar</button>
       </div>
 
     </div>
 
-    <!-- COLUNA 3 — BOTÕES (EXPORTAR / SALVAR) -->
+    <!-- COLUNA 3 — BOTÕES DE AÇÃO -->
     <div class="col-acoes-superior">
-
       <button id="btnExportarTopo" class="btn-acao-topo azul">
-        Exportar CSV
+        Exportar
       </button>
 
       <button id="btnSalvarTopo" class="btn-acao-topo verde">
@@ -583,11 +600,9 @@
       </button>
 
       <button id="btnLimparTopo" class="btn-acao-topo vermelho">
-        Limpar dados
+        Limpar
       </button>
-
     </div>
-
 
   </div>
 
@@ -932,4 +947,3 @@
 </body>
 
 </html>
-
