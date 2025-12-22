@@ -9,6 +9,7 @@ let selectedBanco = new Set();
 let selectedSistema = new Set();
 let registroManualEmEdicao = null;
 let modoSelecaoAtivo = false;
+let modoConciliacaoAutomatica = false;
 
 // arquivos importados (acumulam, não substituem)
 let arquivosOFX = [];
@@ -183,7 +184,33 @@ function limparFiltroDocumentoSistema() {
   input.value = "";
 }
 
+function mostrarAguarde(msg) {
+  let el = document.getElementById("overlayAguarde");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "overlayAguarde";
+    el.style.cssText = `
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.35);
+      display:flex; align-items:center; justify-content:center;
+      z-index:9999; font-size:18px; color:#fff; font-weight:bold;
+    `;
+    document.body.appendChild(el);
+  }
+  el.textContent = msg || "Aguarde...";
+  el.style.display = "flex";
+}
+
+function ocultarAguarde() {
+  const el = document.getElementById("overlayAguarde");
+  if (el) el.style.display = "none";
+}
+
+function valoresIguais(a, b, tolerancia = 0.01) {
+  return Math.abs(a - b) < tolerancia;
+}
 // ---- FIM UTILITARIOS ---- //
+
 
 function buscarSugestoes(itemBanco) {
   const nomeNormalizadoBase = normalizarNomeClienteOfx(itemBanco.desc);
@@ -257,7 +284,99 @@ function buscarSugestoes(itemBanco) {
   }
 
   // ------------------------------
-  // CASO: NÃO É CARTÃO
+  // CASO: É BOLETO
+  // ------------------------------
+  if (tipoOfx === "BOLETO") {
+    if (!dataOfx) return resp;
+
+    const valorOfxAbs = Math.abs(Number(itemBanco.amount || 0));
+    const dataOfxDate = new Date(dataOfx);
+
+    const candidatos = sistemaFiltradoPorTipo.filter(s => {
+      if (!s.data) return false;
+
+      const dataSys = new Date(s.data);
+
+      // nunca depois ou mesmo dia
+      if (dataSys >= dataOfxDate) return false;
+
+      // conta dias úteis ENTRE sistema -> ofx
+      let diasUteis = 0;
+      const cur = new Date(dataSys);
+
+      while (cur < dataOfxDate) {
+        cur.setDate(cur.getDate() + 1);
+        const dia = cur.getDay();
+        if (dia !== 0 && dia !== 6) diasUteis++;
+        if (diasUteis > 3) return false;
+      }
+
+      // somente 2 ou 3 dias úteis antes
+      if (diasUteis !== 2 && diasUteis !== 3) return false;
+
+      return true;
+    });
+
+    // ------------------------------
+    // 1) VALOR EXATO
+    // ------------------------------
+    const valorExato = candidatos.filter(s =>
+      valoresIguais(
+        Math.abs(Number(s.valor || 0)),
+        valorOfxAbs
+      )
+    );
+
+    if (valorExato.length > 0) {
+      resp.mesmoValorMesmaData = valorExato;
+      return resp;
+    }
+
+    // ------------------------------
+    // 2) SOMA DE VALORES (MESMA DATA)
+    // ------------------------------
+    const porData = {};
+
+    candidatos.forEach(s => {
+      if (!porData[s.data]) porData[s.data] = [];
+      porData[s.data].push(s);
+    });
+
+    for (const data in porData) {
+      const lista = porData[data]
+        .map(s => ({
+          ref: s,
+          valorAbs: Math.abs(Number(s.valor || 0))
+        }))
+        .sort((a, b) => b.valorAbs - a.valorAbs);
+
+      function backtrack(i, soma, usados) {
+        if (valoresIguais(soma, valorOfxAbs)) return usados;
+        if (i >= lista.length || soma > valorOfxAbs + 0.01) return null;
+
+        const com = backtrack(
+          i + 1,
+          soma + lista[i].valorAbs,
+          [...usados, lista[i].ref]
+        );
+        if (com) return com;
+
+        return backtrack(i + 1, soma, usados);
+      }
+
+      const resultado = backtrack(0, 0, []);
+
+      if (resultado && resultado.length > 1) {
+        resp.combinacaoCartao = resultado;
+        return resp;
+      }
+    }
+
+    return resp;
+  }
+
+  // ------------------------------
+  // MESMO VALOR (NÃO É CARTÃO)
   // ------------------------------
   if (tipoOfx !== "CARTAO") {
 
@@ -309,97 +428,6 @@ function buscarSugestoes(itemBanco) {
   }
 
   // ------------------------------
-  // CASO: É BOLETO
-  // ------------------------------
-  if (tipoOfx === "BOLETO") {
-    if (!dataOfx) return resp;
-
-    const vOfx = Number(itemBanco.amount || 0);
-
-    const itensDia = sistema.filter(s => {
-      if (!s.data) return false;
-      if (getCategoriaSistema(s.tipo) !== "BOLETO") return false;
-
-      const vSys = Number(s.valor || 0);
-
-      // ✔ respeita sinal (entrada / saída)
-      if (vOfx > 0 && vSys <= 0) return false;
-      if (vOfx < 0 && vSys >= 0) return false;
-
-      if (s.data > dataOfx) return false;
-
-      let dSys = new Date(s.data);
-      let dOfx = new Date(dataOfx);
-
-      let diasUteis = 0;
-      const cur = new Date(dSys);
-
-      while (cur < dOfx) {
-        cur.setDate(cur.getDate() + 1);
-        const dia = cur.getDay();
-        if (dia !== 0 && dia !== 6) diasUteis++;
-        if (diasUteis > 3) return false;
-      }
-
-      return true;
-    });
-
-    // ------------------------------
-    // 1) VALOR EXATO (PRIORIDADE)
-    // ------------------------------
-    const valorExato = itensDia.filter(s =>
-      Math.abs(Number(s.valor || 0)) === valorOfxAbs
-    );
-
-    if (valorExato.length > 0) {
-      resp.mesmoValorMesmaData = valorExato;
-      return resp;
-    }
-
-    // ------------------------------
-    // 2) SOMA DE VALORES (MESMA DATA)
-    // ------------------------------
-    const porData = {};
-
-    itensDia.forEach(s => {
-      if (!porData[s.data]) porData[s.data] = [];
-      porData[s.data].push(s);
-    });
-
-    for (const data in porData) {
-      const lista = porData[data]
-        .map(s => ({
-          ref: s,
-          valorAbs: Math.abs(Number(s.valor || 0))
-        }))
-        .sort((a, b) => b.valorAbs - a.valorAbs);
-
-      function backtrack(i, soma, caminho) {
-        if (soma === valorOfxAbs) return caminho;
-        if (i >= lista.length || soma > valorOfxAbs) return null;
-
-        const com = backtrack(
-          i + 1,
-          soma + lista[i].valorAbs,
-          [...caminho, lista[i].ref]
-        );
-        if (com) return com;
-
-        return backtrack(i + 1, soma, caminho);
-      }
-
-      const resultado = backtrack(0, 0, []);
-
-      if (resultado) {
-        resp.combinacaoCartao = resultado;
-        return resp;
-      }
-    }
-
-    return resp;
-  }
-
-  // ------------------------------
   // CASO: É CARTÃO
   // ------------------------------
   if (tipoOfx === "CARTAO") {
@@ -425,19 +453,12 @@ function buscarSugestoes(itemBanco) {
       const subtipoSys = getSubtipoCartaoSistema(s.tipo);
       if (subtipoSys !== subtipoOfx) return false;
 
-      // ❌ nunca depois do OFX
+      // nunca depois do OFX
       if (s.data > dataOfx) return false;
 
       // até 2 dias úteis antes
       const diff = diffDiasUteis(s.data, dataOfx);
       if (diff > 2) return false;
-
-      const vSys = Math.abs(Number(s.valor || 0));
-      if (vSys < valorOfxAbs) return false;
-
-      const perc = (vSys - valorOfxAbs) / vSys;
-      if (perc < minPerc) return false;
-      if (perc > maxPerc) return false;
 
       return true;
     });
@@ -455,6 +476,61 @@ function buscarSugestoes(itemBanco) {
     resp.mesmoValorOutraData = candidatos.filter(s =>
       s.data !== dataOfx
     );
+
+    // -------------------------------------------------
+    // FALLBACK — SOMA DE VALORES (CARTÃO)
+    // -------------------------------------------------
+
+    // agrupa candidatos por data
+    const porData = {};
+
+    candidatos.forEach(s => {
+      if (!porData[s.data]) porData[s.data] = [];
+      porData[s.data].push(s);
+    });
+
+    for (const data in porData) {
+      const lista = porData[data]
+        .map(s => ({
+          ref: s,
+          valorAbs: Math.abs(Number(s.valor || 0))
+        }))
+        .sort((a, b) => b.valorAbs - a.valorAbs);
+
+      function backtrack(i, soma, caminho) {
+        if (soma > valorOfxAbs * (1 + maxPerc)) return null;
+        if (i >= lista.length) return null;
+
+        const novaSoma = soma + lista[i].valorAbs;
+
+        // valida quando a soma já passou do OFX
+        if (novaSoma > valorOfxAbs) {
+          const perc = (novaSoma - valorOfxAbs) / novaSoma;
+
+          if (perc >= minPerc && perc <= maxPerc) {
+            return [...caminho, lista[i].ref];
+          }
+        }
+
+        // tenta com o item
+        const com = backtrack(
+          i + 1,
+          novaSoma,
+          [...caminho, lista[i].ref]
+        );
+        if (com) return com;
+
+        // tenta sem o item
+        return backtrack(i + 1, soma, caminho);
+      }
+
+      const resultado = backtrack(0, 0, []);
+
+      if (resultado && resultado.length > 1) {
+        resp.combinacaoCartao = resultado;
+        return resp;
+      }
+    }
 
     return resp;
   }
@@ -590,13 +666,12 @@ function mostrarPopupSugestoes(res) {
   `;
   }
 
-
   html += bloco("Mesmo valor e mesma data", res.mesmoValorMesmaData);
   html += bloco("Mesmo valor em outra data", res.mesmoValorOutraData);
   html += bloco("Nome Semelhante", res.mesmoNome);
 
   if (res.combinacaoCartao && res.combinacaoCartao.length > 0) {
-    html += bloco("Combinação Cartão", res.combinacaoCartao);
+    html += bloco("Combinação encontrada", res.combinacaoCartao);
   }
 
   if (!html.trim()) {
@@ -666,7 +741,7 @@ function removerArquivoOFX(nome) {
     f => normalizeFileName(f) !== nomeNorm
   );
 
-  // 🔑 RESETAR FILTRO SE APONTAR PARA O ARQUIVO REMOVIDO
+  //RESETAR FILTRO SE APONTAR PARA O ARQUIVO REMOVIDO
   const sel = document.getElementById("filterBanco");
   if (sel && normalizeFileName(sel.value) === nomeNorm) {
     sel.value = "";
@@ -2045,6 +2120,187 @@ function renderList() {
   atualizarTotais();
 }
 
+//-------------------------
+// CONCILIAÇÃO AUTOMATICA
+//-------------------------
+function conciliacaoAutomatica() {
+  mostrarAguarde("Aguarde... conciliando");
+
+  setTimeout(() => {
+    modoConciliacaoAutomatica = true;
+
+    // percorre todos os OFX não conciliados e não desativados
+    const ofxPendentes = banco.filter(b =>
+      !b.conciliado && !b.desativado
+    );
+
+    ofxPendentes.forEach(ofx => {
+
+      const tipo = (ofx.payment_type || "").toUpperCase();
+      const valorOfxAbs = Math.abs(Number(ofx.amount || 0));
+      const dataOfx = ofx.date;
+
+      if (!dataOfx) return;
+
+      // -----------------------------------
+      // FILTRO BASE DO SISTEMA
+      // -----------------------------------
+      let candidatos = sistema.filter(s => {
+        if (s.conciliado || s.desativado) return false;
+        if (!s.data) return false;
+
+        // tipo compatível
+        if (getCategoriaSistema(s.tipo) !== tipo) return false;
+
+        // sinal compatível
+        if (
+          Math.sign(Number(s.valor || 0)) !==
+          Math.sign(Number(ofx.amount || 0))
+        ) return false;
+
+        // REGRA ABSOLUTA — sistema precisa ter NF
+        if (!s.nf || String(s.nf).trim() === "") return false;
+
+        return true;
+      });
+
+      let candidatosValidos = [];
+
+      // =====================================================
+      // CASOS SIMPLES — PIX / BOLETO / OUTROS
+      // =====================================================
+      if (tipo !== "CARTAO") {
+
+        candidatosValidos = candidatos.filter(s =>
+          Math.abs(Number(s.valor || 0)) === valorOfxAbs &&
+          s.data === dataOfx
+        );
+
+        // só concilia se houver UM ÚNICO
+        if (candidatosValidos.length === 1) {
+          selectedBanco.clear();
+          selectedSistema.clear();
+
+          selectedBanco.add(ofx.id);
+          selectedSistema.add(candidatosValidos[0].id);
+
+          conciliar();
+        }
+
+        return;
+      }
+
+      // =====================================================
+      // CASO: CARTÃO
+      // =====================================================
+      const subtipoOfx = getSubtipoCartaoOfx(ofx.desc);
+      if (!subtipoOfx) return;
+
+      let minPerc = 0;
+      let maxPerc = 0;
+
+      if (subtipoOfx === "DEBITO") {
+        minPerc = 0.009;
+        maxPerc = 0.03;
+      } else if (subtipoOfx === "CREDITO") {
+        minPerc = 0.019;
+        maxPerc = 0.05;
+      }
+
+      // -----------------------------------
+      // ETAPA 1 — VALOR ÚNICO
+      // -----------------------------------
+      const unicos = candidatos.filter(s => {
+
+        const subtipoSys = getSubtipoCartaoSistema(s.tipo);
+        if (subtipoSys !== subtipoOfx) return false;
+
+        if (s.data > dataOfx) return false;
+
+        const diff = diffDiasUteis(s.data, dataOfx);
+        if (diff > 2) return false;
+
+        const vSys = Math.abs(Number(s.valor || 0));
+        if (vSys < valorOfxAbs) return false;
+
+        const perc = (vSys - valorOfxAbs) / vSys;
+        if (perc < minPerc || perc > maxPerc) return false;
+
+        return true;
+      });
+
+      if (unicos.length === 1) {
+        selectedBanco.clear();
+        selectedSistema.clear();
+
+        selectedBanco.add(ofx.id);
+        selectedSistema.add(unicos[0].id);
+
+        conciliar();
+        return;
+      }
+
+      // -----------------------------------
+      // ETAPA 2 — SOMA DE VALORES
+      // -----------------------------------
+      const porData = {};
+
+      unicos.forEach(s => {
+        if (!porData[s.data]) porData[s.data] = [];
+        porData[s.data].push(s);
+      });
+
+      let combinacoesValidas = [];
+
+      for (const data in porData) {
+        const lista = porData[data]
+          .map(s => ({
+            ref: s,
+            valorAbs: Math.abs(Number(s.valor || 0))
+          }))
+          .sort((a, b) => b.valorAbs - a.valorAbs);
+
+        function backtrack(i, soma, usados) {
+          if (soma > valorOfxAbs * (1 + maxPerc)) return;
+          if (i >= lista.length) return;
+
+          const novaSoma = soma + lista[i].valorAbs;
+
+          if (novaSoma > valorOfxAbs) {
+            const perc = (novaSoma - valorOfxAbs) / novaSoma;
+            if (perc >= minPerc && perc <= maxPerc) {
+              combinacoesValidas.push([...usados, lista[i].ref]);
+            }
+          }
+
+          backtrack(i + 1, novaSoma, [...usados, lista[i].ref]);
+          backtrack(i + 1, soma, usados);
+        }
+
+        backtrack(0, 0, []);
+      }
+
+      // só concilia se houver UMA combinação válida
+      if (combinacoesValidas.length === 1) {
+        selectedBanco.clear();
+        selectedSistema.clear();
+
+        selectedBanco.add(ofx.id);
+        combinacoesValidas[0].forEach(s => selectedSistema.add(s.id));
+
+        conciliar();
+      }
+
+    });
+
+    modoConciliacaoAutomatica = false;
+    ocultarAguarde();
+    alert("Conciliação automática finalizada.");
+
+  }, 50);
+}
+
+
 // ------------------------------------------------------------
 // CONCILIAR MANUAL
 // ------------------------------------------------------------
@@ -2149,7 +2405,9 @@ function conciliar() {
   limparFiltroDocumentoSistema();
 
   renderList();
-  alert("Itens conciliados!");
+  if (!modoConciliacaoAutomatica) {
+    alert("Itens conciliados!");
+  }
 
   // fechar popup de sugestões após conciliar
   const popup = document.getElementById("popupSugestoes");
@@ -2318,7 +2576,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     alert("Registro adicionado com sucesso.");
   });
-
 
 
   if (processBtn) {
