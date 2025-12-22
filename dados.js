@@ -230,6 +230,7 @@
         "Chorozinho": 24,
         "Crateus": 24,
         "Crato": 24,
+        "Deputado Irapuan Pinheiro": 24h,
         "Erere": 24,
         "Farias Brito": 24,
         "Fortim": 24,
@@ -247,6 +248,7 @@
         "Itaitinga": 24,
         "Jaguaribara": 24,
         "Jaguaribe": 24,
+        "Jaguaretama: 24,
         "Jaguaruana": 24,
         "Jardim": 72,
         "Jati": 72,
@@ -256,6 +258,7 @@
         "Limoeiro do Norte": 24,
         "Mauriti": 24,
         "Milagres": 24,
+        "Milhã": 24,
         "Missão Velha": 24,
         "Mombaça": 24,
         "Monsenhor Tabosa": 72,
@@ -269,8 +272,10 @@
         "Pacatuba": 24,
         "Palhano": 24,
         "Parambu": 24,
+        "Pedra Branca": 24,
         "Penaforte": 24,
         "Pereiro": 72,
+        "Piquet Carneiro": 24,
         "Pindoretama": 24,
         "Poranga": 24,
         "Porteiras": 24,
@@ -284,6 +289,8 @@
         "Salitre": 24,
         "Santana do Cariri": 24,
         "São João do Jaguaribe": 24,
+        "Senador Pompeu": 24,
+        "Solonópole": 24,
         "Tabuleiro do Norte": 24,
         "Tamboril": 72,
         "Tarrafas": 24,
@@ -556,6 +563,7 @@
     }
   ]
 };
+
 
 
 
