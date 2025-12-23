@@ -248,7 +248,7 @@
         "Itaitinga": 24,
         "Jaguaribara": 24,
         "Jaguaribe": 24,
-        "Jaguaretama: 24,
+        "Jaguaretama": 24,
         "Jaguaruana": 24,
         "Jardim": 72,
         "Jati": 72,
@@ -563,6 +563,7 @@
     }
   ]
 };
+
 
 
 
