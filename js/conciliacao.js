@@ -30,6 +30,9 @@ const paymentColor = {
 // ------------------------------------------------------------
 // UTILITÁRIOS
 // ------------------------------------------------------------
+window._obsPosicionado = false;
+window._obsPopupAbertoId = null;
+
 function formatMoney(n) {
   if (n == null || n === "") return "R$ 0.00";
   return "R$ " + Number(n).toFixed(2);
@@ -205,6 +208,212 @@ function ocultarAguarde() {
   const el = document.getElementById("overlayAguarde");
   if (el) el.style.display = "none";
 }
+
+// ------------------------------------------------------------
+// POPUP OBSERVAÇÃO (OFX)
+// ------------------------------------------------------------
+function abrirPopupObservacao(item, somenteVisualizar = false) {
+  if (!item) return;
+
+  // toggle: se já está aberto para este item, fecha
+  if (window._obsPopupAbertoId === item.id) {
+    const m = document.getElementById("modalObs");
+    if (m) m.style.display = "none";
+    window._obsPopupAbertoId = null;
+    renderList(); // ← ESTA LINHA
+    return;
+  }
+
+  let modal = document.getElementById("modalObs");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "modalObs";
+    modal.style.cssText = `
+      position:fixed;
+      z-index:10000;
+      background:transparent;
+      pointer-events:none;
+    `;
+
+    modal.innerHTML = `
+      <div id="obsBox" style="
+        background:#fff;
+        padding:10px;
+        border-radius:6px;
+        width:300px;
+        box-shadow:0 2px 8px rgba(0,0,0,.25);
+        pointer-events:auto;
+      ">
+
+      <div id="obsDrag"
+        style="
+          font-weight:bold;
+          margin-bottom:4px;
+          cursor:move;
+          user-select:none;
+        ">
+        Observação
+      </div>
+
+        <div id="obsDesc"
+          style="
+            font-size:11px;
+            color:#666;
+            margin-bottom:8px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+          ">
+        </div>
+
+        <textarea id="obsTexto"
+          style="
+            width:100%;
+            height:120px;
+            resize:vertical;
+            padding:8px;
+            font-size:13px;
+            box-sizing:border-box;
+          "
+        ></textarea>
+
+          <div style="
+            margin-top:12px;
+            display:flex;
+            justify-content:flex-end;
+            gap:12px;
+            font-size:13px;
+          ">
+          <span id="obsEditar"
+            title="Editar"
+            style="cursor:pointer; display:none;">
+            ✏️
+          </span>
+
+          <span id="obsSalvar"
+            title="Salvar"
+            style="cursor:pointer; display:none;">
+            💾
+          </span>
+
+          <span id="obsExcluir"
+            title="Excluir observação"
+            style="cursor:pointer;">
+            🗑️
+          </span>
+        </div>
+
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+  }
+
+  const ta = modal.querySelector("#obsTexto");
+  const btnSalvar = modal.querySelector("#obsSalvar");
+  const btnEditar = modal.querySelector("#obsEditar");
+  const btnExcluir = modal.querySelector("#obsExcluir");
+
+  // carregar item
+  modal._item = item;
+  ta.value = item.obs || "";
+  modal.querySelector("#obsDesc").textContent = item.desc || "";
+
+  // modo visualização ou edição
+  if (somenteVisualizar) {
+    ta.readOnly = true;
+    btnSalvar.style.display = "none";
+    btnEditar.style.display = "inline-block";
+  } else {
+    ta.readOnly = false;
+    btnSalvar.style.display = "inline-block";
+    btnEditar.style.display = "none";
+  }
+
+  // SALVAR (sempre funcional)
+  btnSalvar.onclick = () => {
+    modal._item.obs = ta.value.trim();
+    modal.style.display = "none";
+    window._obsPopupAbertoId = null; // ← ESTA LINHA
+    renderList();
+  };
+
+  // EDITAR
+  btnEditar.onclick = () => {
+    ta.readOnly = false;
+    btnEditar.style.display = "none";
+    btnSalvar.style.display = "inline-block";
+    ta.focus();
+  };
+
+  btnExcluir.onclick = () => {
+    modal._item.obs = "";
+    modal.style.display = "none";
+    window._obsPopupAbertoId = null; // ← ESTA LINHA
+    renderList();
+  };
+
+
+  modal.style.display = "block";
+
+  const box = modal.querySelector("#obsBox");
+  const top = (window._obsClickY || 200) - box.offsetHeight - 12;
+
+  box.style.position = "fixed";
+
+  if (!window._obsPosicionado) {
+    box.style.top = Math.max(10, top) + "px";
+    box.style.left = "50%";
+    box.style.transform = "translateX(-50%)";
+    window._obsPosicionado = true;
+  }
+
+  // --------------------------------------------------
+  // DRAG DO POPUP (OBSERVAÇÃO)
+  // --------------------------------------------------
+  const drag = modal.querySelector("#obsDrag");
+
+  let dx = 0;
+  let dy = 0;
+  let dragging = false;
+
+  drag.onmousedown = (e) => {
+    dragging = true;
+
+    const rect = box.getBoundingClientRect();
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+
+    e.preventDefault();
+  };
+
+  const onMouseMove = (e) => {
+    if (!dragging) return;
+    box.style.top = (e.clientY - dy) + "px";
+    box.style.left = (e.clientX - dx) + "px";
+    box.style.transform = "";
+  };
+
+  const onMouseUp = () => {
+    dragging = false;
+  };
+
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
+
+  window._obsPopupAbertoId = item.id;
+  renderList();
+}
+
+// ------------------------------------------------------------
+// ABRIR OBSERVAÇÃO PELO ID (GLOBAL)
+// ------------------------------------------------------------
+window._abrirObsPorId = function (id, somenteVisualizar = false) {
+  const item = banco.find(b => b.id === id);
+  if (!item) return;
+  abrirPopupObservacao(item, somenteVisualizar);
+};
+
 
 function valoresIguais(a, b, tolerancia = 0.01) {
   return Math.abs(a - b) < tolerancia;
@@ -741,7 +950,7 @@ function removerArquivoOFX(nome) {
     f => normalizeFileName(f) !== nomeNorm
   );
 
-  //RESETAR FILTRO SE APONTAR PARA O ARQUIVO REMOVIDO
+  // 🔑 RESETAR FILTRO SE APONTAR PARA O ARQUIVO REMOVIDO
   const sel = document.getElementById("filterBanco");
   if (sel && normalizeFileName(sel.value) === nomeNorm) {
     sel.value = "";
@@ -942,7 +1151,8 @@ function parseOFX(text, filename) {
       payment_type,
       conciliado: false,
       desativado: false,
-      marcado: false
+      marcado: false,
+      obs: ""
     });
   }
 
@@ -1676,18 +1886,22 @@ function renderList() {
               MANUAL
             </span>` : ``}
 
-          ${item.marcado ? `
-            <span style="
-              padding:2px 6px;
-              font-size:11px;
-              border-radius:6px;
-              background:#ff9800;
-              color:#000;
-              font-weight:bold;
-            ">
-              MARCADO
-            </span>
-          ` : ``}
+          ${item.obs ? `
+            <span
+              title="Observação"
+                style="
+                  padding:2px 6px;
+                  font-size:12px;
+                  border-radius:50%;
+                  background:${window._obsPopupAbertoId === item.id ? '#ff3b3b' : '#ffcc00'};
+                  color:#000;
+                  font-weight:bold;
+                  cursor:pointer;
+                  line-height:1;
+                "
+              onclick="event.stopPropagation(); window._obsClickY = event.clientY; window._abrirObsPorId('${item.id}', true)"
+            >!</span>
+      ` : ``}
 
         </div>
 
@@ -1800,8 +2014,8 @@ function renderList() {
           </div>
         `}
 
-        <div id="ctxMarcar" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
-          ${item.marcado ? "Desmarcar" : "Marcar"}
+        <div id="ctxObs" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
+          ${item.marcado ? "Editar observação" : "Adicionar observação"}
         </div>
 
         <div id="ctxToggle" style="padding:8px 12px; cursor:pointer; border-top:1px solid #ddd;">
@@ -1814,11 +2028,10 @@ function renderList() {
       ctxMenu.style.display = "block";
 
       // -------------------------------
-      // DESMARCAR / MARCAR
+      // OBSERVAÇÃO
       // -------------------------------
-      document.getElementById("ctxMarcar").onclick = () => {
-        item.marcado = !item.marcado;
-        renderList();
+      document.getElementById("ctxObs").onclick = () => {
+        abrirPopupObservacao(item);
         ctxMenu.style.display = "none";
       };
 
@@ -2576,6 +2789,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     alert("Registro adicionado com sucesso.");
   });
+
 
 
   if (processBtn) {
