@@ -230,7 +230,7 @@
         "Chorozinho": 24,
         "Crateus": 24,
         "Crato": 24,
-        "Deputado Irapuan Pinheiro": 24h,
+        "Deputado Irapuan Pinheiro": 24,
         "Erere": 24,
         "Farias Brito": 24,
         "Fortim": 24,
@@ -563,6 +563,7 @@
     }
   ]
 };
+
 
 
 
