@@ -1248,11 +1248,10 @@ function parseMatricial(html, filename) {
 
   // DETECÇÃO AUTOMÁTICA DE SAÍDA
   const isPagar =
-    match("paga") ||      // pagamento, pagar, pagas, pagou, pagto
-    match("saida") ||     // saida, saídas, saidas
-    match("desp") ||      // despesa, despesas
-    match("deb") ||      // debito, débito, debitado
-    match("retir");       // retirada, retirar, retirado
+    match("saidas") ||
+    match("saida") ||
+    match("despesas") ||
+    match("despesa");
 
   // rótulo final
   const fileKindLabel = isPagar ? "Saída" : "Entrada";
@@ -2978,3 +2977,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
