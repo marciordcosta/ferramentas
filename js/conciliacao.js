@@ -431,14 +431,6 @@ function buscarSugestoes(itemBanco) {
     const tipoSys = getCategoriaSistema(s.tipo || "").toUpperCase();
     if (tipoSys !== tipoBanco) return false;
 
-    // ===== FILTRO DE ENTRADA / SAÍDA (PASSO ÚNICO) =====
-    const vOfx = Number(itemBanco.amount || 0);
-    const vSys = Number(s.valor || 0);
-
-    if (vOfx < 0 && vSys >= 0) return false; // OFX saída → só saída
-    if (vOfx > 0 && vSys <= 0) return false; // OFX entrada → só entrada
-    // ==================================================
-
     return true;
   });
 
@@ -3016,4 +3008,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
