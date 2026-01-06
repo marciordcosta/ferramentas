@@ -428,11 +428,40 @@ function buscarSugestoes(itemBanco) {
   const tipoBanco = (itemBanco.payment_type || "").toUpperCase();
 
   const sistemaFiltradoPorTipo = sistema.filter(s => {
-    const tipoSys = getCategoriaSistema(s.tipo || "").toUpperCase();
-    if (tipoSys !== tipoBanco) return false;
+  const tipoSys = getCategoriaSistema(s.tipo || "").toUpperCase();
+  if (tipoSys !== tipoBanco) return false;
+
+  // ===== CORREÇÃO SOMENTE NO SISTEMA =====
+  let vSys = Number(s.valor || 0);
+
+  const nomeArquivo = removerAcentos(
+    normalizeFileName(s.systemFileName || s.ofxFileName || s.fileName || "")
+  );
+
+    const ehEntrada =
+      nomeArquivo.includes("entrada") ||
+      nomeArquivo.includes("entradas") ||
+      nomeArquivo.includes("ent") ||
+      nomeArquivo.includes("receb");
+
+    const ehSaida =
+      nomeArquivo.includes("saida") ||
+      nomeArquivo.includes("saidas") ||
+      nomeArquivo.includes("pag");
+
+    if (ehEntrada && !ehSaida) vSys = Math.abs(vSys);
+    if (ehSaida && !ehEntrada) vSys = -Math.abs(vSys);
+
+    // OFX só define o lado, não é alterado
+    const vOfx = Number(itemBanco.amount || 0);
+
+    if (vOfx < 0 && vSys >= 0) return false;
+    if (vOfx > 0 && vSys <= 0) return false;
+    // ======================================
 
     return true;
   });
+
 
 
   const tipoOfx = (itemBanco.payment_type || "").toUpperCase();
@@ -598,51 +627,6 @@ function buscarSugestoes(itemBanco) {
     //COMPARA NOME OFX COM SISTEMA
     resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
 
-      // ===== FILTRO POR SINAL (PASSO ÚNICO) =====
-      const vOfx = Number(itemBanco.amount || 0);
-
-      // --- NORMALIZA ENTRADA / SAÍDA PELO NOME DO ARQUIVO ---
-      let vSys = Number(s.valor || 0);
-
-      // nome normalizado (sem acento, minúsculo)
-      const nomeArquivo = removerAcentos(
-        normalizeFileName(s.ofxFileName || s.fileName || "")
-      );
-
-      // palavras-chave (aceita parcial)
-      const ehEntrada = (
-        nomeArquivo.includes("entrada") ||
-        nomeArquivo.includes("entradas") ||
-        nomeArquivo.includes("ent") ||
-        nomeArquivo.includes("receb") ||
-        nomeArquivo.includes("recebido") ||
-        nomeArquivo.includes("recebidos")
-      );
-
-      const ehSaida = (
-        nomeArquivo.includes("saida") ||
-        nomeArquivo.includes("saidas") ||
-        nomeArquivo.includes("pag") ||
-        nomeArquivo.includes("pagt") ||
-        nomeArquivo.includes("pagto") ||
-        nomeArquivo.includes("pagamento") ||
-        nomeArquivo.includes("pagamentos")
-      );
-
-      // regra de sinal por contexto do arquivo
-      if (ehEntrada && !ehSaida) {
-        vSys = Math.abs(vSys);          // entrada
-      } else if (ehSaida && !ehEntrada) {
-        vSys = -Math.abs(vSys);         // saída
-      }
-      // -----------------------------------------------------
-
-      // filtro final (mantido)
-      if (vOfx < 0 && vSys >= 0) return false;
-      if (vOfx > 0 && vSys <= 0) return false;
-
-      // =========================================
-
       const nomeOfx = normalizarNomeClienteOfx(itemBanco.desc);
       const nomeSys = removerAcentos(String(s.cliente || "").toLowerCase());
 
@@ -803,9 +787,6 @@ function buscarSugestoesMultiplosBanco(itensBanco) {
     0
   );
 
-  // sinal (entrada / saída)
-  const sinalOfx = Math.sign(Number(itensBanco[0].amount || 0));
-
   // data base (primeiro OFX)
   const dataBase = itensBanco[0].date;
 
@@ -814,9 +795,6 @@ function buscarSugestoesMultiplosBanco(itensBanco) {
 
     // tipo PIX
     if (getCategoriaSistema(s.tipo) !== "PIX") return false;
-
-    // sinal compatível
-    if (Math.sign(Number(s.valor || 0)) !== sinalOfx) return false;
 
     // valor exato (soma)
     const v = Math.abs(Number(s.valor || 0));
@@ -1397,12 +1375,6 @@ function applyFilters() {
   });
 
   const sistemaFiltered = sistema.filter(s => {
-    if (f.kind === "receber") {
-      if (Number(s.valor) < 0) return false;
-    }
-    if (f.kind === "pagar") {
-      if (Number(s.valor) >= 0) return false;
-    }
 
     if (f.conciliado === "sim" && !s.conciliado) return false;
     if (f.conciliado === "nao" && s.conciliado) return false;
@@ -2395,12 +2367,6 @@ function conciliacaoAutomatica() {
         // tipo compatível
         if (getCategoriaSistema(s.tipo) !== tipo) return false;
 
-        // sinal compatível
-        if (
-          Math.sign(Number(s.valor || 0)) !==
-          Math.sign(Number(ofx.amount || 0))
-        ) return false;
-
         // REGRA ABSOLUTA — sistema precisa ter NF
         if (!s.nf || String(s.nf).trim() === "") return false;
 
@@ -3008,5 +2974,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
 
