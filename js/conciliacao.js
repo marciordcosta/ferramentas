@@ -607,10 +607,48 @@ function buscarSugestoes(itemBanco) {
     resp.mesmoNome = sistemaFiltradoPorTipo.filter(s => {
 
       // ===== FILTRO POR SINAL (PASSO ÚNICO) =====
-      const vSys = Number(s.valor || 0);
       const vOfx = Number(itemBanco.amount || 0);
-      if (vOfx < 0 && vSys >= 0) return false; // OFX saída → só saída
-      if (vOfx > 0 && vSys <= 0) return false; // OFX entrada → só entrada
+
+      // --- NORMALIZA ENTRADA / SAÍDA PELO NOME DO ARQUIVO ---
+      let vSys = Number(s.valor || 0);
+
+      // nome normalizado (sem acento, minúsculo)
+      const nomeArquivo = removerAcentos(
+        normalizeFileName(s.ofxFileName || s.fileName || "")
+      );
+
+      // palavras-chave (aceita parcial)
+      const ehEntrada = (
+        nomeArquivo.includes("entrada") ||
+        nomeArquivo.includes("entradas") ||
+        nomeArquivo.includes("ent") ||
+        nomeArquivo.includes("receb") ||
+        nomeArquivo.includes("recebido") ||
+        nomeArquivo.includes("recebidos")
+      );
+
+      const ehSaida = (
+        nomeArquivo.includes("saida") ||
+        nomeArquivo.includes("saidas") ||
+        nomeArquivo.includes("pag") ||
+        nomeArquivo.includes("pagt") ||
+        nomeArquivo.includes("pagto") ||
+        nomeArquivo.includes("pagamento") ||
+        nomeArquivo.includes("pagamentos")
+      );
+
+      // regra de sinal por contexto do arquivo
+      if (ehEntrada && !ehSaida) {
+        vSys = Math.abs(vSys);          // entrada
+      } else if (ehSaida && !ehEntrada) {
+        vSys = -Math.abs(vSys);         // saída
+      }
+      // -----------------------------------------------------
+
+      // filtro final (mantido)
+      if (vOfx < 0 && vSys >= 0) return false;
+      if (vOfx > 0 && vSys <= 0) return false;
+
       // =========================================
 
       const nomeOfx = normalizarNomeClienteOfx(itemBanco.desc);
@@ -2978,3 +3016,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
