@@ -1249,9 +1249,7 @@ function parseMatricial(html, filename) {
   // DETECÇÃO AUTOMÁTICA DE SAÍDA
   const isPagar =
     match("saidas") ||
-    match("saida") ||
-    match("despesas") ||
-    match("despesa");
+    match("saida");
 
   // rótulo final
   const fileKindLabel = isPagar ? "Saída" : "Entrada";
@@ -2977,4 +2975,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
