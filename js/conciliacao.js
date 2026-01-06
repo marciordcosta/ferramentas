@@ -1273,6 +1273,10 @@ function parseMatricial(html, filename) {
           resultado.push(atual);
         }
 
+        const valorLido = parseFloat(
+          txt.replace(/\./g, "").replace(/,/g, ".")
+        );
+
         // inicia novo lançamento
         atual = {
           id: `${filename || 'SIST'}_${idx++}`,
@@ -1280,7 +1284,9 @@ function parseMatricial(html, filename) {
           fileKind: fileKindLabel,
           cliente: clienteLinha,
           doc: docLinha,
-          valor: (isPagar ? -1 : 1) * parseFloat(txt.replace(/\./g, "").replace(/,/g, ".")),
+          valor: fileKindLabel === "Entrada"
+            ? valorLido
+            : -Math.abs(valorLido),
           data: null,
           nf: null,
           vendedor: null,
@@ -2975,4 +2981,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
