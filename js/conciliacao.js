@@ -1280,7 +1280,13 @@ function parseMatricial(html, filename) {
           fileKind: fileKindLabel,
           cliente: clienteLinha,
           doc: docLinha,
-          valor: (isPagar ? -1 : 1) * parseFloat(txt.replace(/\./g, "").replace(/,/g, ".")),
+          const valorLido = parseFloat(txt.replace(/\./g, "").replace(/,/g, "."));
+        
+          valor:
+            fileKindLabel === "Entrada"
+            ? valorLido                  // respeita o sinal original
+            : -Math.abs(valorLido),      // saída sempre negativa
+              
           data: null,
           nf: null,
           vendedor: null,
@@ -2975,5 +2981,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensurePainelDiferenca();
 });
+
 
 
