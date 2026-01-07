@@ -561,9 +561,23 @@
         "Pombal": 120,
         "Patos": 120
       }
-    }
+    },
+
+    {
+      "nome": "Ceará Transportes",
+      "uf": "PE",
+      "valorPorKg": 0.85,
+      "valorPorNF": 0.005,
+      "taxaColeta": 25.00,
+      "freteMinimo": 140.00,
+      "prazos": {
+        "Santa Luzia": 96
+      }
+    },
+    
   ]
 };
+
 
 
 
