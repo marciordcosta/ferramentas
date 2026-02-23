@@ -558,6 +558,7 @@
         "Catolé do Rocha": 120,
         "Santa Helena": 120,
         "Joao Pessoa": 120,
+        "Paulista": 120,
         "Pombal": 120,
         "Patos": 120
       }
@@ -577,6 +578,7 @@
     
   ]
 };
+
 
 
 
